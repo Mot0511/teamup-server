@@ -19,9 +19,13 @@ import ru.matveysuvorov.teamup.messages.exceptions.AttachmentNotFoundException;
 import ru.matveysuvorov.teamup.messages.exceptions.MessageNotFoundException;
 import ru.matveysuvorov.teamup.messages.repositories.MessageReadRepository;
 import ru.matveysuvorov.teamup.messages.repositories.MessageRepository;
+import ru.matveysuvorov.teamup.notifications.services.FcmService;
 import ru.matveysuvorov.teamup.storage.FileEntity;
 import ru.matveysuvorov.teamup.storage.FileRepository;
 import ru.matveysuvorov.teamup.storage.services.StorageService;
+import ru.matveysuvorov.teamup.users.entities.UserEntity;
+import ru.matveysuvorov.teamup.users.exceptions.UserNotFoundException;
+import ru.matveysuvorov.teamup.users.repositories.UserRepository;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -39,6 +43,8 @@ public class MessageService {
     private final StorageService storageService;
     private final FileRepository fileRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final FcmService fcmService;
+    private final UserRepository userRepository;
 
     public MessageService(
             MessageRepository messageRepository,
@@ -47,7 +53,9 @@ public class MessageService {
             ChatRepository chatRepository,
             StorageService storageService,
             FileRepository fileRepository,
-            SimpMessagingTemplate messagingTemplate
+            SimpMessagingTemplate messagingTemplate,
+            FcmService fcmService,
+            UserRepository userRepository
     ) {
         this.messageRepository = messageRepository;
         this.messageReadRepository = messageReadRepository;
@@ -56,6 +64,8 @@ public class MessageService {
         this.storageService = storageService;
         this.fileRepository = fileRepository;
         this.messagingTemplate = messagingTemplate;
+        this.fcmService = fcmService;
+        this.userRepository = userRepository;
     }
 
     public boolean isSender(String uid, Integer messageId) {
@@ -90,6 +100,10 @@ public class MessageService {
         MessageResponse response = new MessageResponse(MessageEvent.SEND, message);
 
         messagingTemplate.convertAndSend("/topic/chats/"+chatId, response);
+
+        UserEntity sender = userRepository.findByUid(uid)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        fcmService.sendChatMessageNotification(chatId, uid, sender.getUsername(), request.text());
     }
 
     public void editMessage(String uid, Integer messageId, Message request) {

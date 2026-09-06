@@ -14,6 +14,9 @@ import java.util.Optional;
 public interface MemberRepository extends JpaRepository<MemberEntity, Integer> {
 
     List<MemberEntity> findByMemberId(String uid);
+
+    List<MemberEntity> findByChat_Id(Integer chatId);
+
     Optional<MemberEntity> findByChatAndMemberId(ChatEntity chat, String memberId);
 
     @Modifying

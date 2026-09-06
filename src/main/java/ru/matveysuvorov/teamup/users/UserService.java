@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import ru.matveysuvorov.teamup.auth.entities.AccountEntity;
 import ru.matveysuvorov.teamup.auth.repositories.AccountRepository;
+import ru.matveysuvorov.teamup.notifications.services.FcmService;
 import ru.matveysuvorov.teamup.storage.FileEntity;
 import ru.matveysuvorov.teamup.storage.FileRepository;
 import ru.matveysuvorov.teamup.storage.exceptions.FileNotFoundException;
@@ -32,11 +33,12 @@ public class UserService {
     private final FileRepository fileRepository;
     private final StorageService storageService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final FcmService fcmService;
 
     public UserService(
             UserRepository userRepository,
             AccountRepository accountRepository,
-            FriendshipRepository friendshipRepository, FileRepository fileRepository, StorageService storageService, SimpMessagingTemplate messagingTemplate
+            FriendshipRepository friendshipRepository, FileRepository fileRepository, StorageService storageService, SimpMessagingTemplate messagingTemplate, FcmService fcmService
     ) {
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
@@ -44,6 +46,7 @@ public class UserService {
         this.fileRepository = fileRepository;
         this.storageService = storageService;
         this.messagingTemplate = messagingTemplate;
+        this.fcmService = fcmService;
     }
 
     public UserEntity getUser(String uid) {
@@ -107,6 +110,11 @@ public class UserService {
         friendship.setToUser(toUser);
         friendship.setStatus(false);
         friendshipRepository.save(friendship);
+
+        String fromUserName = userRepository.findByUid(fromUser)
+                .map(UserEntity::getUsername)
+                .orElse(fromUser);
+        fcmService.sendFriendRequestNotification(toUser, fromUserName);
     }
 
     public void allowFriendRequest(String fromUser, String toUser) {

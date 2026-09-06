@@ -6,6 +6,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import ru.matveysuvorov.teamup.chats.ChatService;
 import ru.matveysuvorov.teamup.chats.entities.ChatEntity;
+import ru.matveysuvorov.teamup.messages.enums.MessageEvent;
+import ru.matveysuvorov.teamup.notifications.services.FcmService;
 import ru.matveysuvorov.teamup.search.dto.*;
 import ru.matveysuvorov.teamup.search.enums.SearchEvent;
 import ru.matveysuvorov.teamup.search.enums.SearchResult;
@@ -18,6 +20,7 @@ import ru.matveysuvorov.teamup.users.entities.UserEntity;
 
 import javax.annotation.Nullable;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,11 +34,13 @@ public class SearchService {
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
     private final TeamService teamService;
+    private final FcmService fcmService;
 
-    public SearchService(UserService userService, SimpMessagingTemplate messagingTemplate, TeamService teamService) {
+    public SearchService(UserService userService, SimpMessagingTemplate messagingTemplate, TeamService teamService, FcmService fcmService) {
         this.userService = userService;
         this.messagingTemplate = messagingTemplate;
         this.teamService = teamService;
+        this.fcmService = fcmService;
     }
 
     public SearchResponse getSearch(String uid, SearchRequest request) {
@@ -63,6 +68,10 @@ public class SearchService {
             );
             teamService.addMembers(uid, search.getUsers().stream().map(UserEntity::getUid).toList(), team.getId());
             broadcast(search.getId(), SearchEvent.FORMED, team);
+
+            List<String> memberUids = search.getUsers().stream().map(UserEntity::getUid).toList();
+            fcmService.sendSearchCompleteNotification(memberUids);
+
             return new SearchFormedResponse(team);
         }
 

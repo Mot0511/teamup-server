@@ -1,6 +1,6 @@
 # TeamUp Server — API Documentation
 
-Бэкенд мессенджера/платформы поиска команд. Spring Boot, JWT-аутентификация (Resource Server OAuth2 JWT), WebSocket (STOMP) для реального времени, PostgreSQL + MinIO (S3).
+Бэкенд мессенджера/платформы поиска команд. Spring Boot 4.1, JWT-аутентификация (Resource Server OAuth2 JWT), WebSocket (STOMP) для реального времени, Firebase Cloud Messaging (FCM) для пуш-уведомлений, PostgreSQL + MinIO (S3).
 
 ## Содержание
 
@@ -13,10 +13,12 @@
   - [Chats](#chats)
   - [Messages](#messages)
   - [Search](#search)
+  - [Notifications (FCM)](#notifications-fcm)
 - [WebSocket (STOMP)](#websocket-stomp)
   - [Подключение](#подключение)
   - [Входящие (клиент → сервер)](#входящие-клиент--сервер)
   - [Рассылки (сервер → клиент)](#рассылки-сервер--клиент)
+- [События автоматических уведомлений](#события-автоматических-уведомлений)
 - [Примечания и замеченные проблемы](#примечания)
 
 ---
@@ -33,16 +35,16 @@
 Authorization: Bearer <accessToken>
 ```
 
-- Сам эндпоинт `/auth/login`, `/auth/register`, `/auth/google`, `/auth/verify-email`, `/auth/forgot` — публичные.
+- `/auth/login`, `/auth/register`, `/auth/google`, `/auth/verify-email`, `/auth/forgot` — публичные.
 - Всё остальное закрыто.
 - Пользователь идентифицируется по `uid` (subject токена), берётся из `Authentication.getName()`.
 
 ### Форматы
 
-- Тело запроса/ответа — JSON (`application/json`).
+- Тело запроса/ответа — JSON (`application/json`), если не указано иное.
 - Даты в `Instant` сериализуются в ISO-8601 (UTC).
 - Файлы — `multipart/form-data`, поле `file`.
-- Единица времени `Instant`, в БД — `timestamptz` (Hibernate `jdbc.time_zone=UTC`).
+- В БД: `Instant` хранится как `timestamptz` (Hibernate `jdbc.time_zone=UTC`).
 
 ---
 
@@ -174,7 +176,7 @@ Query params: `page` (int, обязательный), `limit` (int, обязат
 
 #### `PUT /users/`
 
-Изменить профиль текущего пользователя. Тело — то же `CreateUserRequest`, что и выше.
+Изменить профиль текущего пользователя. Тело — то же `CreateUserRequest`.
 
 Ответ: `200` — `UserEntity`.
 
@@ -192,7 +194,7 @@ Path param: `uid` (string).
 
 #### `POST /users/friends`
 
-Отправить заявку в друзья.
+Отправить заявку в друзья. После отправки автоматически шлёт FCM-уведомление получателю (если он оффлайн).
 
 Запрос:
 
@@ -232,7 +234,7 @@ Path param: `uid` (string).
 
 Path param: `uid` (string).
 
-Ответ: `200` — `true`/`false` (boolean). *(В коде возвращается сырой `Boolean`, не `OnlineStatusResponse` — см. [Примечания](#примечания).)*
+Ответ: `200` — `true`/`false` (boolean).
 
 #### `POST /users/avatars`
 
@@ -346,7 +348,7 @@ Path param: `chatId` (int).
 
 #### `POST /messages/{messageId}/read`
 
-Отметить сообщение прочитанным (только участник чата). Шлёт WebSocket-событие `READ`.
+Отметить сообщение прочитанным (только участник чата). Шлёт WebSocket-событие `READ` и FCM-уведомление о прочтении.
 
 Path param: `messageId` (int).
 
@@ -373,29 +375,99 @@ Path param: `messageId` (int).
 
 ### Search
 
-Базовый путь: `/search`
+Базовый путь: `/searches`
 
-#### `POST /search/`
+#### `POST /searches/`
 
-Начать (или присоединиться к) поиску команды по параметрам. Логика сопоставляет пользователя с уже существующей «сессией поиска» по ключу `(game, age, size, gender)`; если сессии нет — создаёт новую и шлёт WebSocket-событие `NEW_USER`.
+Начать (или присоединиться к) поиску команды по параметрам. Логика сопоставляет пользователя с уже существующей «сессией поиска» по ключу `(game, age, size, gender)`.
 
-Параметры приходят query-string'ом (метод без аннотации `@RequestBody`, `SearchRequest` биндится из query/формы).
+Параметры приходят query-string'ом (`SearchRequest` биндится из query/формы).
 
 Query/форма: `game` (int), `gender` (string), `size` (int), `age` (int).
 
-Ответ: `200` — `SearchResponse`:
+**Возможные ответы (наследники `SearchResponse`):**
+
+`SearchCreatedResponse` — сессия поиска создана впервые:
 
 ```json
-{
-  "result": "created",           // или "found"
-  "search": {
-    "id": "<uuid>",
-    "users": [ { ...UserEntity } ]
-  }
-}
+{ "result": "created", "search": { "id": "<uuid>", "users": [ ... ] } }
 ```
 
-От «found» дополнительно рассылается WebSocket-событие в канал `/topic/searches/{searchId}`.
+`SearchFoundResponse` — пользователь присоединился к существующей сессии:
+
+```json
+{ "result": "found", "search": { "id": "<uuid>", "users": [ ... ] } }
+```
+
+`SearchFormedResponse` — команда набрана (команда автоматически создаётся):
+
+```json
+{ "result": "found", "team": { ...ChatEntity } }
+```
+
+При `FORMED` дополнительно рассылается FCM-уведомление участникам, которые оффлайн.
+
+#### `POST /searches/{searchId}/leave`
+
+Покинуть сессию поиска.
+
+Path param: `searchId` (UUID).
+
+Ответ: `200`.
+
+Рассылается WebSocket-событие `LEAVE_USER` в `/topic/searches/{searchId}`.
+
+---
+
+### Notifications (FCM)
+
+Базовый путь: `/fcm`
+
+#### `POST /fcm/token`
+
+Зарегистрировать (или обновить) FCM-токен текущего пользователя. Клиент должен вызывать этот эндпоинт при запуске приложения и при каждом обновлении токена.
+
+Query param: `fcm_token` (string, обязательный).
+
+Ответ: `200`.
+
+Ошибки: `401` — не авторизован.
+
+#### `DELETE /fcm/token`
+
+Удалить (отозвать) FCM-токен. Клиент должен вызывать при logout.
+
+Query param: `fcm_token` (string, обязательный).
+
+Ответ: `200`.
+
+Ошибки: `401` — не авторизован.
+
+#### Таблица `fcm_tokens`
+
+| Поле | Тип | Ограничения | Описание |
+|---|---|---|---|
+| `id` | `Long` | PK, auto-increment | Идентификатор записи |
+| `fcm_token` | `String` | NOT NULL, UNIQUE | FCM-токен устройства |
+| `uid` | `String` | NOT NULL | ID пользователя (`UserEntity.uid`) |
+
+#### Форматы push-уведомлений
+
+При отправке FCM-уведомления клиенту приходит:
+
+```
+title: <строка>
+body: <строка>
+data.type: new_message | friend_request | search_complete
+```
+
+Таблица полей `data` по типам:
+
+| `type` | Дополнительные поля | Генерируется при |
+|---|---|---|
+| `new_message` | `chatId` | входящее сообщение (только оффлайн-участники чата, кроме отправителя) |
+| `friend_request` | `fromUser` | заявка в друзья (только оффлайн-получатель) |
+| `search_complete` | `uid` | завершение поиска — команда набрана (только оффлайн-участники) |
 
 ---
 
@@ -427,7 +499,7 @@ Handshake через STOMP `CONNECT` с JWT в заголовке `Authorization
 
 #### `SEND /realtime/chats/{chatId}/send`
 
-Отправить сообщение в чат (только участник).
+Отправить сообщение в чат (только участник). После сохранения в БД автоматически рассылает FCM-уведомление участникам, которые оффлайн.
 
 Body (`Message`):
 
@@ -470,8 +542,9 @@ Path: `status` (boolean).
 
 | Канал | Событие | Описание |
 |---|---|---|
-| `SUBSCRIBE /topic/chats/{chatId}` | `MessageResponse` | Все события по чату: `SEND`, `EDIT`, `DELETE`, `READ` |
-| `SUBSCRIBE /topic/searches/{searchId}` | `SearchMessage` | События поиска: `new_user`, `remove_user`, `delete_search` |
+| `SUBSCRIBE /topic/chats/{chatId}` | `MessageResponse` / `MessageResponseById` | События по чату: `SEND`, `EDIT`, `DELETE`, `READ` |
+| `SUBSCRIBE /topic/searches/{searchId}` | `SearchMessage` | События поиска: `new_user`, `leave_user`, `formed` |
+| `SUBSCRIBE /topic/user/{uid}/status` | `Boolean` | Изменение онлайн-статуса пользователя |
 
 **`MessageResponse`** для `SEND`/`EDIT`:
 
@@ -491,19 +564,39 @@ Path: `status` (boolean).
 { "event": "new_user", "data": { ...UserEntity } }
 ```
 
+```json
+{ "event": "formed", "data": { ...ChatEntity } }
+```
+
 **Enum значения:**
 - `MessageEvent`: `SEND`, `EDIT`, `DELETE`, `READ`
-- `SearchEvent`: `new_user`, `remove_user`, `delete_search`
+- `SearchEvent`: `new_user`, `leave_user`, `formed`
 - `SearchResult`: `created`, `found`
+
+---
+
+## События автоматических уведомлений
+
+Помимо WebSocket-рассылок, сервер автоматически отправляет push-уведомления через FCM при следующих условиях:
+
+| Триггер | Получатели | Условие |
+|---|---|---|
+| **Входящее сообщение** | Все участники чата, кроме отправителя | `isOnline = false` |
+| **Заявка в друзья** | Получатель заявки (`toUser`) | `isOnline = false` |
+| **Команда набрана (search formed)** | Все участники сессии поиска | `isOnline = false` |
+
+Все уведомления — только для пользователей, у которых нет активной WebSocket-сессии (оффлайн). Если пользователь онлайн — он получает обновление через WebSocket в реальном времени.
 
 ---
 
 ## Примечания
 
-Замечания по текущему коду (не ошибки документации, а потенциальные баги/несоответствия):
+Замечания по текущему коду:
 
-1. `SearchController` помечен `@RestController("/search")` — аннотация с value не задаёт базовый путь. Правильнее `@RestController` + `@RequestMapping("/search")`. Аналогично в `MessageController` (`@RestController("/messages")`) и в `SearchController` метод вызывается как `searchService.search(...)`, однако в `SearchService` такой метод отсутствует (есть `getSearch`) — проект сейчас не скомпилируется.
-2. `UserController.GET /users/status/{uid}` возвращает сырой `Boolean` из `userService.getOnlineStatus(uid)`, при этом есть DTO `OnlineStatusResponse(boolean isOnline)` — вероятно, ожидался он.
-3. `ChatController`, `MessageController` и `SearchController` аннотированы `@Controller` (а не `@RestController`/`@Controller` с `@ResponseBody`). Проектированняя логика понятна из сервисов, но формально такие эндпоинты могут не сериализовать ответ в JSON без `@ResponseBody`.
-4. Кэш `Search` и древовидная структура хранятся в памяти сервиса (`HashMap`), при рестарте/нескольких инстансах теряются.
-5. Парсинг в `ChatMemberInterceptor` и `MessageInterceptor` завязан на строгий формат пути (`split("/")[2]`) — небезопасно для произвольных destination.
+1. `WebSocketSecurityConfig` наследует `AbstractSecurityWebSocketMessageBrokerConfigurer`, который **удалён в Spring Security 7** (Spring Boot 4.1). Компиляция блокируется. Решение — заменить на `@Configuration @EnableWebSocketMessageBroker` и полагаться на `RealtimeAuthInterceptor` (уже реализован) для аутентификации WebSocket-сессий.
+2. `SearchController` помечен `@RestController("/searches")` — аннотация с value не задаёт базовый путь. Правильнее `@RestController` + `@RequestMapping("/searches")`. Аналогично в `MessageController` (`@RestController("/messages")`).
+3. `UserController.GET /users/status/{uid}` возвращает сырой `Boolean`, хотя есть DTO `OnlineStatusResponse(boolean isOnline)`.
+4. `ChatController`, `MessageController` и `SearchController` аннотированы `@Controller` (а не `@RestController`). Формально такие эндпоинты могут не сериализовать ответ в JSON без `@ResponseBody`.
+5. Кэш `Search` и древовидная структура хранятся в памяти (`HashMap`), при рестарте/нескольких инстансах теряются.
+6. Парсинг в `ChatMemberInterceptor` и `MessageInterceptor` завязан на строгий формат пути (`split("/")[2]`) — небезопасно для произвольных destination.
+7. `FcmService.sendChatMessageNotification` вызывает `memberRepository.findByChat_Id()` — при большом количестве участников чата может быть эффективнее один запрос с фильтрацией по онлайн-статусу в SQL.
