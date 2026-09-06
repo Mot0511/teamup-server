@@ -1,0 +1,24 @@
+<div>
+    <h2>Подтверждение почты на <span style="color: #016335">Teamup</span></h2>
+    <p>Чтобы подтвердить почту, нажми на кнопку ниже:</p>
+    <a 
+        class="button" 
+        th:href="${verificationUrl}"
+        style="
+        background-color: #016335; 
+        color: white; 
+        padding: 10px 20px; 
+        text-decoration: none;
+        transition: 0.3s all;
+        border-radius: 10px;
+        "
+    >Подтвердить почту</a>
+    <br />
+    <br />
+    <p>Если ты не собирался подтверждать почту, просто забей на это письмо. И на кнопку не нажимай!</p>
+</div>
+<style>
+    * {
+        font-family: 'Arial', sans-serif;
+    }
+</style>
