@@ -6,11 +6,12 @@ import ru.matveysuvorov.teamup.search.models.Search;
 public class SearchFoundResponse extends SearchResponse {
 
     private final Search search;
-
-    public SearchFoundResponse(Search search) {
+public SearchFoundResponse(Search search) {
         this.search = search;
-        super.result = SearchResult.FOUND;
     }
 
+    public Search getSearch() {
+        return search;
+    }
 
 }

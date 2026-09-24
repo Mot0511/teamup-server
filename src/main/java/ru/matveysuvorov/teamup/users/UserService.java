@@ -7,6 +7,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import ru.matveysuvorov.teamup.auth.entities.AccountEntity;
 import ru.matveysuvorov.teamup.auth.repositories.AccountRepository;
+import ru.matveysuvorov.teamup.games.GameEntity;
+import ru.matveysuvorov.teamup.games.GameRepository;
+import ru.matveysuvorov.teamup.games.exceptions.GameNotFoundException;
 import ru.matveysuvorov.teamup.notifications.services.FcmService;
 import ru.matveysuvorov.teamup.storage.FileEntity;
 import ru.matveysuvorov.teamup.storage.FileRepository;
@@ -30,28 +33,30 @@ public class UserService {
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
     private final FriendshipRepository friendshipRepository;
+    private final GameRepository gameRepository;
     private final FileRepository fileRepository;
     private final StorageService storageService;
-    private final SimpMessagingTemplate messagingTemplate;
+
     private final FcmService fcmService;
 
     public UserService(
             UserRepository userRepository,
             AccountRepository accountRepository,
-            FriendshipRepository friendshipRepository, FileRepository fileRepository, StorageService storageService, SimpMessagingTemplate messagingTemplate, FcmService fcmService
+            FriendshipRepository friendshipRepository, GameRepository gameRepository, FileRepository fileRepository, StorageService storageService, FcmService fcmService
     ) {
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
         this.friendshipRepository = friendshipRepository;
+        this.gameRepository = gameRepository;
         this.fileRepository = fileRepository;
         this.storageService = storageService;
-        this.messagingTemplate = messagingTemplate;
         this.fcmService = fcmService;
     }
 
     public UserEntity getUser(String uid) {
-        System.out.println(uid);
-        return userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
+        UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
+        System.out.println(user);
+        return user;
     };
 
     public UserEntity create(String uid, CreateUserRequest userdata) {
@@ -71,7 +76,9 @@ public class UserService {
         user.setDescription(userdata.description());
         user.setAge(userdata.age());
         user.setGender(userdata.gender());
-        user.setFavouriteGame(userdata.game());
+
+        GameEntity game = gameRepository.findById(userdata.game()).orElseThrow(() -> new GameNotFoundException("Game not found"));
+        user.setFavouriteGame(game);
         user.setOnline(false);
 
         userRepository.save(user);
@@ -85,7 +92,8 @@ public class UserService {
         user.setDescription(userdata.description());
         user.setGender(userdata.gender());
         user.setAge(userdata.age());
-        user.setFavouriteGame(userdata.game());
+        GameEntity game = gameRepository.findById(userdata.game()).orElseThrow(() -> new GameNotFoundException("Game not found"));
+        user.setFavouriteGame(game);
 
         userRepository.save(user);
         return user;
@@ -100,21 +108,20 @@ public class UserService {
         return friendships;
     }
 
-    public void addFriend(String fromUser, String toUser) {
-        if (!userRepository.existsByUid(fromUser) || !userRepository.existsByUid(toUser)) {
-            throw new UserNotFoundException("Users not found");
-        }
+    public void addFriend(String fromUserId, String toUserId) {
+        UserEntity fromUser = userRepository.findByUid(fromUserId)
+                .orElseThrow(() -> new UserNotFoundException("User"+fromUserId+" not found"));
+
+        UserEntity toUser = userRepository.findByUid(toUserId)
+                .orElseThrow(() -> new UserNotFoundException("User"+toUserId+" not found"));
 
         FriendshipEntity friendship = new FriendshipEntity();
-        friendship.setFromUser(fromUser);
-        friendship.setToUser(toUser);
+        friendship.setFromUser(fromUserId);
+        friendship.setToUser(toUserId);
         friendship.setStatus(false);
         friendshipRepository.save(friendship);
 
-        String fromUserName = userRepository.findByUid(fromUser)
-                .map(UserEntity::getUsername)
-                .orElse(fromUser);
-        fcmService.sendFriendRequestNotification(toUser, fromUserName);
+        fcmService.sendFriendRequestNotification(toUser, fromUser);
     }
 
     public void allowFriendRequest(String fromUser, String toUser) {
@@ -148,8 +155,6 @@ public class UserService {
         UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
         user.setOnline(status);
         userRepository.save(user);
-
-        messagingTemplate.convertAndSend("/topic/user/"+uid+"/status", status);
     }
 
     public List<UserEntity> getUsers(Integer page, Integer limit) {
@@ -193,7 +198,15 @@ public class UserService {
 
     public void deleteAvatar(String uid) {
         FileEntity fileEntity = fileRepository.findByUploaderId(uid).orElseThrow(() -> new AvatarNotExists("User doesn't have avatar"));
+        fileRepository.delete(fileEntity);
         storageService.delete(fileEntity.getStorageKey());
     }
 
+    public boolean isUsernameExists(String username) {
+        return userRepository.existsByUsername(username);
+    }
+
+    public boolean isEmailExists(String email) {
+        return userRepository.existsByEmail(email);
+    }
 }

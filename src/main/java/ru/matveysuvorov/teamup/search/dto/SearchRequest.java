@@ -1,7 +1,7 @@
 package ru.matveysuvorov.teamup.search.dto;
 
 public record SearchRequest(
-        Integer game,
+        Long game,
         String gender,
         Integer size,
         Integer age

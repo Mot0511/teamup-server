@@ -13,31 +13,31 @@ import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<MemberEntity, Integer> {
 
-    List<MemberEntity> findByMemberId(String uid);
+    List<MemberEntity> findByMemberUid(String uid);
 
-    List<MemberEntity> findByChat_Id(Integer chatId);
+    List<MemberEntity> findByChatId(Long chatId);
 
-    Optional<MemberEntity> findByChatAndMemberId(ChatEntity chat, String memberId);
+    Optional<MemberEntity> findByChatAndMemberUid(ChatEntity chat, String memberId);
 
     @Modifying
     @Query("""
 DELETE FROM MemberEntity m
 WHERE m.chat.id = :chatId
 """)
-    void deleteByChatId(@Param("chatId") Integer chatId);
+    void deleteByChatId(@Param("chatId") Long chatId);
 
     @Modifying
     @Query("""
 DELETE FROM MemberEntity m
 WHERE m.chat.id = :chatId
-AND m.memberId = :memberId
+AND m.member.uid = :memberId
 """)
-    void deleteByChatIdAndMemberId(@Param("chatId") Integer chatId, @Param("memberId") String memberId);
+    void deleteByChatIdAndMemberId(@Param("chatId") Long chatId, @Param("memberId") String memberId);
 
     @Query("""
 SELECT m FROM MemberEntity m
 WHERE m.chat.isTeam = true
-AND m.memberId = :uid
+AND m.member.uid = :uid
 """)
     List<MemberEntity> findTeamsByUid(@Param("uid") String uid);
 }

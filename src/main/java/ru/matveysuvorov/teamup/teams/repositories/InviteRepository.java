@@ -7,7 +7,7 @@ import java.util.Optional;
 
 public interface InviteRepository extends JpaRepository<InviteEntity, Integer> {
 
-    Optional<InviteEntity> findByTeamId(Integer teamId);
-    Optional<InviteEntity> findByTeamIdAndNumber(Integer teamId, Integer number);
+    Optional<InviteEntity> findByTeamId(Long teamId);
+    Optional<InviteEntity> findByTeamIdAndNumber(Long teamId, Integer number);
 
 }

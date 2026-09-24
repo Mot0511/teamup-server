@@ -12,6 +12,8 @@ import ru.matveysuvorov.teamup.auth.entities.AccountEntity;
 import ru.matveysuvorov.teamup.auth.entities.EmailVerificationTokenEntity;
 import ru.matveysuvorov.teamup.auth.entities.ProviderAccountEntity;
 import ru.matveysuvorov.teamup.auth.entities.ResetPasswordTokenEntity;
+import ru.matveysuvorov.teamup.auth.exceptions.AccountNotFound;
+import ru.matveysuvorov.teamup.auth.exceptions.UnauthorizedException;
 import ru.matveysuvorov.teamup.auth.repositories.AccountRepository;
 import ru.matveysuvorov.teamup.auth.dto.*;
 import ru.matveysuvorov.teamup.auth.repositories.EmailVerificationTokenRepository;
@@ -20,6 +22,7 @@ import ru.matveysuvorov.teamup.auth.repositories.ResetPasswordTokenRepository;
 import ru.matveysuvorov.teamup.security.JwtService;
 import ru.matveysuvorov.teamup.users.exceptions.UserNotFoundException;
 
+import javax.security.auth.login.AccountNotFoundException;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
@@ -34,6 +37,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final GoogleAuthService googleAuthService;
+    private final DiscordAuthService discordAuthService;
     private final EmailVerificationTokenRepository emailTokenRepository;
     private final ResetPasswordTokenRepository resetPasswordTokenRepository;
     private final EmailService emailService;
@@ -43,6 +47,7 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             GoogleAuthService googleAuthService,
+            DiscordAuthService discordAuthService,
             ProviderAccountRepository providerAccountRepository,
             EmailVerificationTokenRepository emailVerificationTokenRepository,
             ResetPasswordTokenRepository resetPasswordTokenRepository,
@@ -52,6 +57,7 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.googleAuthService = googleAuthService;
+        this.discordAuthService = discordAuthService;
         this.providerAccountRepository = providerAccountRepository;
         this.emailTokenRepository = emailVerificationTokenRepository;
         this.resetPasswordTokenRepository = resetPasswordTokenRepository;
@@ -133,18 +139,24 @@ public class AuthService {
 
     public AuthResponse googleAuth(GoogleAuthRequest request) throws IOException, GeneralSecurityException {
         GoogleUser googleUser = googleAuthService.verify(request.provider_id_token());
-        if (!providerAccountRepository.existsByProviderUserId(googleUser.user_id())) {
-            AccountEntity account = new AccountEntity();
+        AccountEntity account;
+        if (!accountRepository.existsByEmail(googleUser.email())) {
+            account = new AccountEntity();
             account.setEmail(googleUser.email());
             account.setEnabled(true);
             account.setIsEmailConfirmed(true);
             account.setCraetedAt(Instant.now());
             accountRepository.save(account);
+        } else {
+            account = accountRepository.findByEmail(googleUser.email()).orElseThrow(() -> new AccountNotFound("Account not found"));
+        }
 
+        if (!providerAccountRepository.existsByProviderUserId(googleUser.user_id())) {
             ProviderAccountEntity providerAccount = new ProviderAccountEntity();
             providerAccount.setProvider("google");
             providerAccount.setUserId(account.getId());
             providerAccount.setProviderUserId(googleUser.user_id());
+            providerAccountRepository.save(providerAccount);
 
             String token = jwtService.generateToken(account.getId());
             return new AuthResponse(token, "Bearer");
@@ -154,6 +166,39 @@ public class AuthService {
 
         String token = jwtService.generateToken(providerAccount.getUserId());
         return new AuthResponse(token, "Bearer");
+    }
+
+    @Transactional
+    public String discordAuth(DiscordAuthRequest request) throws IOException, InterruptedException {
+        DiscordUser discordUser = discordAuthService.verify(request.code());
+
+        if (providerAccountRepository.existsByProviderUserId(discordUser.user_id())) {
+            ProviderAccountEntity providerAccount = providerAccountRepository.findByProviderUserId(discordUser.user_id());
+
+            accountRepository.findById(providerAccount.getUserId())
+                    .orElseThrow(() -> new AccountNotFound("Account not found"));
+
+            return jwtService.generateToken(providerAccount.getUserId());
+        }
+
+        AccountEntity account = accountRepository.findByEmail(discordUser.email())
+                .orElseGet(() -> {
+                    AccountEntity newAccount = new AccountEntity();
+                    newAccount.setEmail(discordUser.email());
+                    newAccount.setEnabled(true);
+                    newAccount.setIsEmailConfirmed(true);
+                    newAccount.setCraetedAt(Instant.now());
+
+                    return accountRepository.save(newAccount);
+                });
+
+        ProviderAccountEntity providerAccount = new ProviderAccountEntity();
+        providerAccount.setProvider("discord");
+        providerAccount.setUserId(account.getId());
+        providerAccount.setProviderUserId(discordUser.user_id());
+        providerAccountRepository.save(providerAccount);
+
+        return jwtService.generateToken(account.getId());
     }
 
     public void forgotPassword(String email) {
@@ -174,4 +219,23 @@ public class AuthService {
         emailService.sendResetPasswordEmail(email, token);
    }
 
+   public void resetPassword(ResetPasswordRequest request) {
+        String tokenHash = DigestUtils.sha256Hex(request.token());
+
+        ResetPasswordTokenEntity entity = resetPasswordTokenRepository.findByTokenHash(tokenHash).orElseThrow(() -> new UnauthorizedException("Token hash is not found"));
+        if (entity.getExpiredAt().isBefore(Instant.now())) throw new UnauthorizedException("Token is expired");
+
+        entity.setUsedAt(Instant.now());
+        resetPasswordTokenRepository.save(entity);
+
+        String newPasswordHash = passwordEncoder.encode(request.newPassword());
+        AccountEntity account = accountRepository.findByEmail(request.email()).orElseThrow(() -> new AccountNotFound("Account not found"));
+        account.setPasswordHash(newPasswordHash);
+        accountRepository.save(account);
+   }
+
+    public AccountEntity getAccount(String uid) throws AccountNotFoundException {
+        AccountEntity account = accountRepository.findById(UUID.fromString(uid)).orElseThrow(() -> new AccountNotFoundException("Account not found"));
+        return account;
+    }
 }

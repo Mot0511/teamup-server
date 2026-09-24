@@ -3,8 +3,9 @@ package ru.matveysuvorov.teamup.teams.dto;
 import java.util.List;
 
 public record EditTeamRequest(
-        Integer team_id,
+        Long teamId,
         String newName,
+        Long gameId,
         List<String> addedMembers,
         List<String> removedMembers
 ) {

@@ -12,17 +12,20 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import ru.matveysuvorov.teamup.auth.exceptions.UnauthorizedException;
 import ru.matveysuvorov.teamup.chats.ChatService;
+import ru.matveysuvorov.teamup.chats.entities.MemberEntity;
+import ru.matveysuvorov.teamup.chats.repositories.MemberRepository;
 
 import java.security.Principal;
+import java.util.List;
 
 
 @Component
 public class ChatMemberInterceptor implements ChannelInterceptor {
 
-    private final ChatService chatService;
+    private final MemberRepository memberRepository;
 
-    public ChatMemberInterceptor(ChatService chatService) {
-        this.chatService = chatService;
+    public ChatMemberInterceptor(MemberRepository memberRepository) {
+        this.memberRepository = memberRepository;
     }
 
     @Override
@@ -47,8 +50,10 @@ public class ChatMemberInterceptor implements ChannelInterceptor {
         if (destination == null) return message;
 
         if (destination.startsWith("/realtime/chats")) {
-            Integer chatId = Integer.parseInt(destination.split("/")[2]);
-            if (!chatService.isMember(uid, chatId)) {
+            Long chatId = Long.parseLong(destination.split("/")[2]);
+            List<MemberEntity> members = memberRepository.findByMemberUid(uid);
+            List<Long> chat_ids = members.stream().map(member -> member.getChat().getId()).toList();
+            if (!chat_ids.contains(chatId)) {
                 throw new AccessDeniedException("User is not a member of this chat");
             }
 

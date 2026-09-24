@@ -1,9 +1,13 @@
 package ru.matveysuvorov.teamup.auth;
 
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import ru.matveysuvorov.teamup.auth.dto.*;
+import ru.matveysuvorov.teamup.auth.entities.AccountEntity;
 import ru.matveysuvorov.teamup.auth.services.AuthService;
+import ru.matveysuvorov.teamup.users.UserService;
 
+import javax.security.auth.login.AccountNotFoundException;
 import java.io.IOException;
 
 @RestController
@@ -11,9 +15,11 @@ import java.io.IOException;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserService userService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, UserService userService) {
         this.authService = authService;
+        this.userService = userService;
     }
 
     @PostMapping("/register")
@@ -22,6 +28,14 @@ public class AuthController {
     ) {
         authService.register(request);
         return "Please, check your email for verification!";
+    }
+
+    @GetMapping("/me")
+    public AccountResponse getAccount(
+            Authentication auth
+    ) throws AccountNotFoundException {
+        AccountEntity account = authService.getAccount(auth.getName());
+        return new AccountResponse(account.getId(), account.getEmail(), account.isEmailConfirmed());
     }
 
     @PostMapping("/login")
@@ -38,6 +52,13 @@ public class AuthController {
         return authService.googleAuth(request);
     }
 
+    @PostMapping("/discord")
+    public String discord(
+            @RequestBody DiscordAuthRequest request
+    ) throws IOException, InterruptedException {
+        return authService.discordAuth(request);
+    }
+
     @GetMapping("/verify-email")
     public AuthResponse verifyEmail(
             @RequestParam String token
@@ -51,6 +72,27 @@ public class AuthController {
     ) {
         authService.forgotPassword(request.email());
         return "Please, check your email for reset password";
+    }
+
+    @PostMapping("/reset")
+    public void resetPassword(
+            @RequestBody ResetPasswordRequest request
+    ) {
+        authService.resetPassword(request);
+    }
+
+    @GetMapping("/username/{username}/exists")
+    public boolean isUsernameExists(
+            @PathVariable String username
+    ) {
+        return userService.isUsernameExists(username);
+    }
+
+    @GetMapping("/email/{email}/exists")
+    public boolean isEmailExists(
+            @PathVariable String email
+    ) {
+        return userService.isEmailExists(email);
     }
 
 }

@@ -38,7 +38,7 @@ public class RealtimeConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         config.enableSimpleBroker("/topic");
-        config.setApplicationDestinationPrefixes("/realtime");
+        config.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
@@ -47,5 +47,4 @@ public class RealtimeConfig implements WebSocketMessageBrokerConfigurer {
                 .setAllowedOriginPatterns("*")
                 .withSockJS();
     }
-
 }

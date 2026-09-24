@@ -51,7 +51,7 @@ public class EmailService {
     }
 
     public void sendResetPasswordEmail(String email, UUID token) {
-        String resetPasswordUrl = String.format("http://localhost:3000/reset?email=%s&token=%s", email, token.toString());
+        String resetPasswordUrl = String.format("http://localhost:3000/password/reset?email=%s&token=%s", email, token.toString());
         Context context = new Context();
         context.setVariable("recoveryUrl", resetPasswordUrl);
         String html = templateEngine.process("email/recovery", context);

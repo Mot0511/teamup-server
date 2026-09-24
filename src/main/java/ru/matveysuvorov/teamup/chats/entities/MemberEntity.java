@@ -14,8 +14,9 @@ public class MemberEntity {
     @Column(name="id")
     private Integer id;
 
-    @Column(name="member_id", nullable = false)
-    private String memberId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name="member_id", nullable = false)
+    private UserEntity member;
 
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumn(name="chat_id")
@@ -32,12 +33,12 @@ public class MemberEntity {
         this.id = id;
     }
 
-    public String getMemberId() {
-        return memberId;
+    public UserEntity getMember() {
+        return member;
     }
 
-    public void setMemberId(String memberId) {
-        this.memberId = memberId;
+    public void setMember(UserEntity member) {
+        this.member = member;
     }
 
     public ChatEntity getChat() {

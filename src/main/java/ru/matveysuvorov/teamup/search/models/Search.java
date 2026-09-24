@@ -3,15 +3,16 @@ package ru.matveysuvorov.teamup.search.models;
 import org.apache.catalina.User;
 import ru.matveysuvorov.teamup.users.entities.UserEntity;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 public class Search {
 
     private UUID id = UUID.randomUUID();
-    private List<UserEntity> users;
+    private List<UserEntity> users = new ArrayList<UserEntity>();
 
-    private Integer game;
+    private Long game;
     private Integer age;
     private Integer size;
     private String gender;
@@ -31,18 +32,18 @@ public class Search {
     }
 
     public void removeUser(String uid) {
-        users = users.stream().filter(user -> user.getUid() != uid).toList();
+        users = users.stream().filter(user -> !user.getUid().equals(uid)).toList();
     }
 
     public void setUsers(List<UserEntity> users) {
         this.users = users;
     }
 
-    public Integer getGame() {
+    public Long getGame() {
         return game;
     }
 
-    public void setGame(Integer game) {
+    public void setGame(Long game) {
         this.game = game;
     }
 

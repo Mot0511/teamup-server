@@ -8,8 +8,9 @@ import java.util.Optional;
 
 public interface MessageRepository extends JpaRepository<MessageEntity, Integer> {
 
-    List<MessageEntity> findByChatId(Integer chatId);
-    Optional<MessageEntity> findById(Integer id);
-    void deleteById(Integer id);
+    List<MessageEntity> findByChatId(Long chatId);
+    Optional<MessageEntity> findById(Long id);
+    Optional<MessageEntity> findFirstByChatIdOrderBySendedAtDesc(Long chatId);
+    void deleteById(Long id);
 
 }

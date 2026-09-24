@@ -1,6 +1,7 @@
 package ru.matveysuvorov.teamup.users.entities;
 
 import jakarta.persistence.*;
+import ru.matveysuvorov.teamup.games.GameEntity;
 import ru.matveysuvorov.teamup.storage.FileEntity;
 
 import java.util.UUID;
@@ -31,8 +32,9 @@ public class UserEntity {
     @Column(name="description")
     private String description;
 
-    @Column(name="favourite_game")
-    private Long favouriteGame;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name="favourite_game")
+    private GameEntity favouriteGame;
 
     @Column(name="is_online")
     private Boolean online;
@@ -88,12 +90,20 @@ public class UserEntity {
         this.description = description;
     }
 
-    public Long getFavouriteGame() {
+    public GameEntity getFavouriteGame() {
         return favouriteGame;
     }
 
-    public void setFavouriteGame(Long game) {
-        this.favouriteGame = game;
+    public void setFavouriteGame(GameEntity favouriteGame) {
+        this.favouriteGame = favouriteGame;
+    }
+
+    public UUID getAvatar_id() {
+        return avatar_id;
+    }
+
+    public void setAvatar_id(UUID avatar_id) {
+        this.avatar_id = avatar_id;
     }
 
     public Boolean isOnline() {

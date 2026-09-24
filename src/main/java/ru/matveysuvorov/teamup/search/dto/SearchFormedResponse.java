@@ -10,7 +10,10 @@ public class SearchFormedResponse extends SearchResponse {
 
     public SearchFormedResponse(ChatEntity team) {
         this.team = team;
-        super.result = SearchResult.FOUND;
+    }
+
+    public ChatEntity getTeam() {
+        return team;
     }
 
 }

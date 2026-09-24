@@ -17,7 +17,7 @@ public class InviteEntity {
     private Integer number;
 
     @Column(name="team_id", nullable = false, unique = true)
-    private Integer teamId;
+    private Long teamId;
 
     @Column(name="expired_at", nullable = false)
     private Instant expiredAt;
@@ -38,11 +38,11 @@ public class InviteEntity {
         this.number = number;
     }
 
-    public Integer getTeamId() {
+    public Long getTeamId() {
         return teamId;
     }
 
-    public void setTeamId(Integer teamId) {
+    public void setTeamId(Long teamId) {
         this.teamId = teamId;
     }
 

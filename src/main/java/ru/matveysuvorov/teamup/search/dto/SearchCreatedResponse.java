@@ -9,7 +9,10 @@ public class SearchCreatedResponse extends SearchResponse {
 
     public SearchCreatedResponse(Search search) {
         this.search = search;
-        super.result = SearchResult.CREATED;
+    }
+
+    public Search getSearch() {
+        return search;
     }
 
 }

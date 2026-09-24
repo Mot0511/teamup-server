@@ -12,6 +12,7 @@
   - [Users](#users)
   - [Chats](#chats)
   - [Messages](#messages)
+  - [Games](#games)
   - [Search](#search)
   - [Notifications (FCM)](#notifications-fcm)
 - [WebSocket (STOMP)](#websocket-stomp)
@@ -54,6 +55,16 @@ Authorization: Bearer <accessToken>
 
 Базовый путь: `/auth`
 
+#### `GET /auth/me`
+
+Данные текущего аккаунта (по токену).
+
+Ответ: `200` — `AccountResponse`:
+
+```json
+{ "uid": "<uuid>", "email": "user@example.com", "isVerified": true }
+```
+
 #### `POST /auth/register`
 
 Регистрация. Создаёт аккаунт и отправляет письмо со ссылкой подтверждения.
@@ -94,10 +105,10 @@ Please, check your email for verification!
 
 Вход через Google (OAuth-верификация `id_token`).
 
-Запрос:
+Запрос (`GoogleAuthRequest`):
 
 ```json
-{ "user_id": "<google user id>", "provider_id_token": "<google id token>" }
+{ "provider_id_token": "<google id token>" }
 ```
 
 Ответ: `200` — `AuthResponse` (см. выше). Если такого пользователя нет — создаётся автоматически.
@@ -127,6 +138,22 @@ Query param: `token` (string).
 ```
 Please, check your email for reset password
 ```
+
+#### `GET /auth/username/{username}/exists`
+
+Проверка занятости username (вспомогательный эндпоинт для форм).
+
+Path param: `username` (string).
+
+Ответ: `200` — `true`/`false` (boolean).
+
+#### `GET /auth/email/{email}/exists`
+
+Проверка занятости email (вспомогательный эндпоинт для форм).
+
+Path param: `email` (string).
+
+Ответ: `200` — `true`/`false` (boolean).
 
 ---
 
@@ -161,6 +188,14 @@ Please, check your email for reset password
 Query params: `page` (int, обязательный), `limit` (int, обязательный).
 
 Ответ: `200` — массив `UserEntity`.
+
+#### `GET /users/{uid}`
+
+Получить пользователя по uid.
+
+Path param: `uid` (string).
+
+Ответ: `200` — `UserEntity` (см. `/users/me`).
 
 #### `POST /users/`
 
@@ -290,21 +325,29 @@ Path param: `uid` (string).
 
 Query param: `other` (uid string).
 
-Ответ: `200`.
+Ответ: `200` — `ChatEntity` (созданный чат).
 
 #### `GET /chats/{chatId}`
 
 Получить чат по id (только если пользователь участник).
 
-Path param: `chatId` (int).
+Path param: `chatId` (long).
 
 Ответ: `200` — `ChatEntity`.
+
+#### `GET /chats/{chatId}/users`
+
+Участники чата (только если пользователь участник).
+
+Path param: `chatId` (long).
+
+Ответ: `200` — массив `UserEntity`.
 
 #### `DELETE /chats/{chatId}`
 
 Удалить чат (только если пользователь участник).
 
-Path param: `chatId` (int).
+Path param: `chatId` (long).
 
 Ответ: `200`.
 
@@ -312,9 +355,9 @@ Path param: `chatId` (int).
 
 Список id прочитанных сообщений в чате.
 
-Path param: `chatId` (int).
+Path param: `chatId` (long).
 
-Ответ: `200` — массив `Integer` (id прочитанных сообщений).
+Ответ: `200` — массив `Long` (id прочитанных сообщений).
 
 ---
 
@@ -326,7 +369,7 @@ Path param: `chatId` (int).
 
 История сообщений чата (только для участника).
 
-Path param: `chatId` (int).
+Path param: `chatId` (long).
 
 Ответ: `200` — массив `MessageEntity`:
 
@@ -350,7 +393,7 @@ Path param: `chatId` (int).
 
 Отметить сообщение прочитанным (только участник чата). Шлёт WebSocket-событие `READ` и FCM-уведомление о прочтении.
 
-Path param: `messageId` (int).
+Path param: `messageId` (long).
 
 Ответ: `200`.
 
@@ -358,7 +401,7 @@ Path param: `messageId` (int).
 
 Загрузить вложение к сообщению (только автор сообщения).
 
-Path param: `messageId` (int).
+Path param: `messageId` (long).
 Body: `multipart/form-data`, поле `file`.
 
 Ответ: `200`.
@@ -367,9 +410,46 @@ Body: `multipart/form-data`, поле `file`.
 
 Presigned URL вложения сообщения (только участник чата).
 
-Path param: `messageId` (int).
+Path param: `messageId` (long).
 
 Ответ: `200` — string (URL).
+
+---
+
+### Games
+
+Базовый путь: `/games`
+
+Каталог игр. id игры (`GameEntity.id`) используется другими модулями как справочная величина: `UserEntity.favouriteGame`, `ChatEntity.game`, `CreateUserRequest.game` (при создании/редактировании профиля) и `SearchRequest.game` (поиск команд в `/searches/`).
+
+Требуется JWT (`anyRequest().authenticated()`), в методах `Authentication` не используется.
+
+#### `GET /games/`
+
+Список всех игр.
+
+Ответ: `200` — массив `GameEntity`:
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Dota 2",
+    "addedAt": "2026-01-01T00:00:00Z",
+    "gameCoverId": "<uuid>"
+  }
+]
+```
+
+#### `GET /games/{gameId}/url`
+
+Presigned URL обложки игры.
+
+Path param: `gameId` (long).
+
+Ответ: `200` — string (URL на файл в S3).
+
+Ошибки: `404` — игра не найдена / обложка не найдена.
 
 ---
 
@@ -385,24 +465,24 @@ Path param: `messageId` (int).
 
 Query/форма: `game` (int), `gender` (string), `size` (int), `age` (int).
 
-**Возможные ответы (наследники `SearchResponse`):**
+**Возможные ответы (наследники `SearchResponse`, их различает дискриминатор `result`):**
 
-`SearchCreatedResponse` — сессия поиска создана впервые:
+`SearchCreatedResponse` — сессия поиска создана впервые (`result: "CREATED"`):
 
 ```json
-{ "result": "created", "search": { "id": "<uuid>", "users": [ ... ] } }
+{ "result": "CREATED", "search": { "id": "<uuid>", "users": [ ... ] } }
 ```
 
-`SearchFoundResponse` — пользователь присоединился к существующей сессии:
+`SearchFoundResponse` — пользователь присоединился к существующей сессии (`result: "FOUND"`):
 
 ```json
-{ "result": "found", "search": { "id": "<uuid>", "users": [ ... ] } }
+{ "result": "FOUND", "search": { "id": "<uuid>", "users": [ ... ] } }
 ```
 
-`SearchFormedResponse` — команда набрана (команда автоматически создаётся):
+`SearchFormedResponse` — команда набрана (команда автоматически создаётся) (`result: "FORMED"`):
 
 ```json
-{ "result": "found", "team": { ...ChatEntity } }
+{ "result": "FORMED", "team": { ...ChatEntity } }
 ```
 
 При `FORMED` дополнительно рассылается FCM-уведомление участникам, которые оффлайн.
@@ -449,7 +529,7 @@ Query param: `fcm_token` (string, обязательный).
 |---|---|---|---|
 | `id` | `Long` | PK, auto-increment | Идентификатор записи |
 | `fcm_token` | `String` | NOT NULL, UNIQUE | FCM-токен устройства |
-| `uid` | `String` | NOT NULL | ID пользователя (`UserEntity.uid`) |
+| `user_id` | `String` | NOT NULL | ID пользователя (`UserEntity.uid`) |
 
 #### Форматы push-уведомлений
 
@@ -501,7 +581,7 @@ Handshake через STOMP `CONNECT` с JWT в заголовке `Authorization
 
 Отправить сообщение в чат (только участник). После сохранения в БД автоматически рассылает FCM-уведомление участникам, которые оффлайн.
 
-Body (`Message`):
+Body (`MessageRequest`):
 
 ```json
 {
@@ -518,7 +598,7 @@ Body (`Message`):
 
 Отредактировать текст сообщения (только автор — проверка `isSender`).
 
-Body: `Message` (см. выше).
+Body: `MessageRequest` (см. выше).
 
 Участники получают событие `EDIT`.
 
@@ -561,17 +641,17 @@ Path: `status` (boolean).
 **`SearchMessage`**:
 
 ```json
-{ "event": "new_user", "data": { ...UserEntity } }
+{ "event": "new_user", "payload": { ...UserEntity } }
 ```
 
 ```json
-{ "event": "formed", "data": { ...ChatEntity } }
+{ "event": "formed", "payload": { ...ChatEntity } }
 ```
 
 **Enum значения:**
 - `MessageEvent`: `SEND`, `EDIT`, `DELETE`, `READ`
 - `SearchEvent`: `new_user`, `leave_user`, `formed`
-- `SearchResult`: `created`, `found`
+- `SearchResult`: `created`, `found`, `formed` (в JSON ответах `/searches` встречаются только имена подтипов из `@JsonSubTypes`: `CREATED`, `FOUND`, `FORMED`)
 
 ---
 
@@ -593,10 +673,8 @@ Path: `status` (boolean).
 
 Замечания по текущему коду:
 
-1. `WebSocketSecurityConfig` наследует `AbstractSecurityWebSocketMessageBrokerConfigurer`, который **удалён в Spring Security 7** (Spring Boot 4.1). Компиляция блокируется. Решение — заменить на `@Configuration @EnableWebSocketMessageBroker` и полагаться на `RealtimeAuthInterceptor` (уже реализован) для аутентификации WebSocket-сессий.
-2. `SearchController` помечен `@RestController("/searches")` — аннотация с value не задаёт базовый путь. Правильнее `@RestController` + `@RequestMapping("/searches")`. Аналогично в `MessageController` (`@RestController("/messages")`).
-3. `UserController.GET /users/status/{uid}` возвращает сырой `Boolean`, хотя есть DTO `OnlineStatusResponse(boolean isOnline)`.
-4. `ChatController`, `MessageController` и `SearchController` аннотированы `@Controller` (а не `@RestController`). Формально такие эндпоинты могут не сериализовать ответ в JSON без `@ResponseBody`.
-5. Кэш `Search` и древовидная структура хранятся в памяти (`HashMap`), при рестарте/нескольких инстансах теряются.
-6. Парсинг в `ChatMemberInterceptor` и `MessageInterceptor` завязан на строгий формат пути (`split("/")[2]`) — небезопасно для произвольных destination.
-7. `FcmService.sendChatMessageNotification` вызывает `memberRepository.findByChat_Id()` — при большом количестве участников чата может быть эффективнее один запрос с фильтрацией по онлайн-статусу в SQL.
+1. `UserController.GET /users/status/{uid}` возвращает сырой `Boolean`, хотя есть DTO `OnlineStatusResponse(boolean isOnline)`.
+2. Кэш `Search` и древовидная структура хранятся в памяти (`HashMap`), при рестарте/нескольких инстансах теряются.
+3. Парсинг в `ChatMemberInterceptor` и `MessageInterceptor` завязан на строгий формат пути (`split("/")[2]`) — небезопасно для произвольных destination.
+4. `FcmService.sendChatMessageNotification` вызывает `memberRepository.findByChat_Id()` — при большом количестве участников чата может быть эффективнее один запрос с фильтрацией по онлайн-статусу в SQL.
+5. В DTO `MessageRequest` поле `repliedMessage` осталось `Optional<Integer>`, хотя id сообщений были переведены на `Long` — потенциальный переполнение при больших id.

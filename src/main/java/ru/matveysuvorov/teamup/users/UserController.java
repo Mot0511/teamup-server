@@ -3,6 +3,7 @@ package ru.matveysuvorov.teamup.users;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,16 +14,18 @@ import ru.matveysuvorov.teamup.users.entities.UserEntity;
 
 import java.util.List;
 
-@RestController()
+@RestController
 @RequestMapping("/users")
 public class UserController {
 
     private final UserService userService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public UserController(
-            UserService userService
+            UserService userService, SimpMessagingTemplate messagingTemplate
     ) {
         this.userService = userService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @GetMapping("/me")
@@ -36,6 +39,13 @@ public class UserController {
             @RequestParam Integer limit
     ) {
         return userService.getUsers(page, limit);
+    }
+
+    @GetMapping("/{uid}")
+    public UserEntity getUser(
+            @PathVariable String uid
+    ) {
+        return userService.getUser(uid);
     }
 
     @PostMapping("/")
@@ -95,6 +105,7 @@ public class UserController {
             Authentication auth
     ) {
         userService.setOnlineStatus(auth.getName(), status);
+        messagingTemplate.convertAndSend("/topic/user/"+auth.getName()+"/status", status);
     }
 
     @PostMapping("/avatars")

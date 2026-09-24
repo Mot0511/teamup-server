@@ -55,15 +55,15 @@ public class FcmService {
      * Отправка уведомления о входящем сообщении всем офлайн-участникам чата,
      * кроме отправителя.
      */
-    public void sendChatMessageNotification(Integer chatId, String senderUid, String senderName, String text) {
-        List<MemberEntity> members = memberRepository.findByChat_Id(chatId);
+    public void sendChatMessageNotification(Long chatId, String senderUid, String senderName, String text) {
+        List<MemberEntity> members = memberRepository.findByChatId(chatId);
 
         members.stream()
-                .map(MemberEntity::getMemberId)
+                .map(MemberEntity::getMember)
                 .filter(memberUid -> !memberUid.equals(senderUid))
                 .filter(this::isOffline)
-                .forEach(memberUid -> sendToUser(
-                        memberUid,
+                .forEach(member -> sendToUser(
+                        member.getUid(),
                         senderName,
                         text,
                         Map.of("type", "new_message", "chatId", String.valueOf(chatId))
@@ -73,13 +73,13 @@ public class FcmService {
     /**
      * Отправка уведомления о заявке в друзья офлайн-получателю (toUser).
      */
-    public void sendFriendRequestNotification(String toUser, String fromUserName) {
+    public void sendFriendRequestNotification(UserEntity toUser, UserEntity fromUser) {
         if (isOffline(toUser)) {
             sendToUser(
-                    toUser,
+                    toUser.getUid(),
                     "Новая заявка в друзья",
-                    fromUserName + " хочет добавить вас в друзья",
-                    Map.of("type", "friend_request", "fromUser", toUser)
+                    fromUser.getUsername() + " хочет добавить вас в друзья",
+                    Map.of("type", "friend_request", "fromUser", toUser.getUid())
             );
         }
     }
@@ -87,14 +87,14 @@ public class FcmService {
     /**
      * Отправка уведомления о завершении поиска всем офлайн-участникам найденной группы.
      */
-    public void sendSearchCompleteNotification(List<String> memberUids) {
-        memberUids.stream()
+    public void sendSearchCompleteNotification(List<UserEntity> members) {
+        members.stream()
                 .filter(this::isOffline)
-                .forEach(uid -> sendToUser(
-                        uid,
+                .forEach(member -> sendToUser(
+                        member.getUid(),
                         "Поиск завершён",
                         "Команда найдена! Соберитесь и начните играть вместе.",
-                        Map.of("type", "search_complete", "uid", uid)
+                        Map.of("type", "search_complete", "uid", member.getUid())
                 ));
     }
 
@@ -148,8 +148,8 @@ public class FcmService {
         }
     }
 
-    private boolean isOffline(String uid) {
-        return userRepository.findByUid(uid)
+    private boolean isOffline(UserEntity member) {
+        return userRepository.findByUid(member.getUid())
                 .map(user -> !Boolean.TRUE.equals(user.isOnline()))
                 .orElse(true);
     }

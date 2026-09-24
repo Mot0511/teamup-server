@@ -11,25 +11,25 @@ public class MessageReadEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name="id")
-    private Integer id;
+    private Long id;
 
     @Column(name="user_id", nullable = false)
     private String userId;
 
     @Column(name="message_id", nullable = false)
-    private Integer messageId;
+    private Long messageId;
 
     @Column(name="chat_id", nullable = false)
-    private Integer chatId;
+    private Long chatId;
 
     @Column(name="readed_at", nullable = false)
     private Instant readedAt;
 
-    public Integer getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
@@ -41,19 +41,19 @@ public class MessageReadEntity {
         this.userId = userId;
     }
 
-    public Integer getMessageId() {
+    public Long getMessageId() {
         return messageId;
     }
 
-    public void setMessageId(Integer messageId) {
+    public void setMessageId(Long messageId) {
         this.messageId = messageId;
     }
 
-    public Integer getChatId() {
+    public Long getChatId() {
         return chatId;
     }
 
-    public void setChatId(Integer chatId) {
+    public void setChatId(Long chatId) {
         this.chatId = chatId;
     }
 

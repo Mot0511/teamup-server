@@ -2,6 +2,7 @@ package ru.matveysuvorov.teamup.chats.entities;
 
 import jakarta.persistence.*;
 import org.springframework.data.annotation.TypeAlias;
+import ru.matveysuvorov.teamup.games.GameEntity;
 import ru.matveysuvorov.teamup.storage.FileEntity;
 import ru.matveysuvorov.teamup.users.entities.UserEntity;
 
@@ -16,7 +17,7 @@ public class ChatEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name="id")
-    private Integer id;
+    private Long id;
 
     @Column(name="name")
     private String name;
@@ -27,8 +28,9 @@ public class ChatEntity {
     @Column(name="is_public", nullable = false)
     private Boolean isPublic;
 
-    @Column(name="game")
-    private Integer game;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name="game")
+    private GameEntity game;
 
     @Column(name="created_at", nullable = false)
     private Instant createdAt;
@@ -37,11 +39,11 @@ public class ChatEntity {
     @JoinColumn(name="icon_id")
     private FileEntity icon;
 
-    public Integer getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
@@ -69,11 +71,11 @@ public class ChatEntity {
         this.isPublic = isPublic;
     }
 
-    public Integer getGame() {
+    public GameEntity getGame() {
         return game;
     }
 
-    public void setGame(Integer game) {
+    public void setGame(GameEntity game) {
         this.game = game;
     }
 

@@ -4,6 +4,6 @@ import ru.matveysuvorov.teamup.messages.enums.MessageEvent;
 
 public record MessageResponseById(
         MessageEvent event,
-        Integer messageId
+        Long messageId
 ) {
 }

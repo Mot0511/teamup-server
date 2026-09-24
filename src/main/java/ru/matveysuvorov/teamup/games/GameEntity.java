@@ -3,6 +3,7 @@ package ru.matveysuvorov.teamup.games;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name="games")
@@ -18,6 +19,9 @@ public class GameEntity {
 
     @Column(name="added_at", nullable = false)
     private Instant addedAt;
+
+    @Column(name="game_cover_id", nullable = false)
+    private UUID gameCoverId;
 
     public Integer getId() {
         return id;
@@ -41,5 +45,13 @@ public class GameEntity {
 
     public void setAddedAt(Instant addedAt) {
         this.addedAt = addedAt;
+    }
+
+    public UUID getGameCoverId() {
+        return gameCoverId;
+    }
+
+    public void setGameCoverId(UUID gameCoverId) {
+        this.gameCoverId = gameCoverId;
     }
 }

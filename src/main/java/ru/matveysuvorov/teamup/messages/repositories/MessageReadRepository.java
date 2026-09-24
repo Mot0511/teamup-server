@@ -8,6 +8,6 @@ import java.util.List;
 
 public interface MessageReadRepository extends JpaRepository<MessageReadEntity, Integer> {
 
-    List<MessageReadEntity> findByChatId(Integer chatId);
+    List<MessageReadEntity> findByChatId(Long chatId);
 
 }

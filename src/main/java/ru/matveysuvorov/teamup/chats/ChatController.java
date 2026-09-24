@@ -1,14 +1,13 @@
 package ru.matveysuvorov.teamup.chats;
 
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import ru.matveysuvorov.teamup.chats.entities.ChatEntity;
+import ru.matveysuvorov.teamup.users.entities.UserEntity;
 
 import java.util.List;
 
-@Controller
+@RestController
 @RequestMapping("/chats")
 public class ChatController {
 
@@ -27,18 +26,26 @@ public class ChatController {
         return chatService.getChats(auth.getName());
     }
 
+    @GetMapping("/{chatId}/users")
+    public List<UserEntity> getUsersByTeam(
+            Authentication auth,
+            @PathVariable Long chatId
+    ) {
+        return chatService.getUsersByTeam(auth.getName(), chatId);
+    }
+
     @PostMapping("/")
-    public void addChat(
+    public ChatEntity addChat(
             Authentication auth,
             @RequestParam String other
-    ) {
-        chatService.addChat(auth.getName(), other);
+    ) { 
+        return chatService.addChat(auth.getName(), other);
     }
 
     @GetMapping("/{chatId}")
     public ChatEntity getChat(
             Authentication auth,
-            @PathVariable Integer chatId
+            @PathVariable Long chatId
     ) {
         return chatService.getChat(auth.getName(), chatId);
     }
@@ -46,15 +53,15 @@ public class ChatController {
     @DeleteMapping("/{chatId}")
     public void deleteChat(
             Authentication auth,
-            @PathVariable Integer chatId
+            @PathVariable Long chatId
     ) {
         chatService.deleteChat(auth.getName(), chatId);
     }
 
     @GetMapping("/{chatId}/reads")
-    public List<Integer> getReads(
+    public List<Long> getReads(
             Authentication auth,
-            @PathVariable Integer chatId
+            @PathVariable Long chatId
     ) {
         return chatService.getMessageReads(auth.getName(), chatId);
     }

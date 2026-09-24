@@ -43,10 +43,7 @@ public class StorageService {
 
             client.putObject(
                     request,
-                    RequestBody.fromInputStream(
-                            file.getInputStream(),
-                            file.getSize()
-                    )
+                    RequestBody.fromBytes(file.getBytes())
             );
 
         } catch (IOException e) {

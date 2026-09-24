@@ -14,7 +14,7 @@ public class FcmTokenEntity {
     @Column(name = "fcm_token", nullable = false, unique = true)
     private String fcmToken;
 
-    @Column(name = "uid", nullable = false)
+    @Column(name = "user_id", nullable = false)
     private String uid;
 
     public Long getId() {

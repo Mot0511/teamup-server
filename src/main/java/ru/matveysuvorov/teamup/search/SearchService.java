@@ -1,6 +1,7 @@
 package ru.matveysuvorov.teamup.search;
 
 import jakarta.mail.search.SearchException;
+import org.apache.catalina.User;
 import org.springframework.expression.spel.ast.OpAnd;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -28,7 +29,7 @@ import java.util.UUID;
 @Service
 public class SearchService {
 
-    private final Map<Integer, Map<Integer, Map<Integer, Map<String, Search>>>> tree = new HashMap<>();
+    private final Map<Long, Map<Integer, Map<Integer, Map<String, Search>>>> tree = new HashMap<>();
     private final Map<UUID, Search> searches = new HashMap<>();
 
     private final UserService userService;
@@ -53,6 +54,7 @@ public class SearchService {
         Search search = teamSizeBranch.get(request.gender());
         if (search == null) return createSearch(uid, request);
 
+
         UserEntity user = userService.getUser(uid);
         search.addUser(user);
 
@@ -63,13 +65,14 @@ public class SearchService {
                     uid,
                     new AddTeamRequest(
                             "Быстрая команда",
-                            true
+                            true,
+                            request.game()
                     )
             );
             teamService.addMembers(uid, search.getUsers().stream().map(UserEntity::getUid).toList(), team.getId());
             broadcast(search.getId(), SearchEvent.FORMED, team);
 
-            List<String> memberUids = search.getUsers().stream().map(UserEntity::getUid).toList();
+            List<UserEntity> memberUids = search.getUsers();
             fcmService.sendSearchCompleteNotification(memberUids);
 
             return new SearchFormedResponse(team);
@@ -79,7 +82,7 @@ public class SearchService {
     }
 
     private SearchResponse createSearch(String uid, SearchRequest request) {
-
+        System.out.println("Creating search");
         Search search = new Search();
         search.setAge(request.age());
         search.setGame(request.game());
@@ -102,6 +105,7 @@ public class SearchService {
 
         genderBranch.put(request.gender(), search);
 
+
         return new SearchCreatedResponse(search);
     }
 
@@ -111,8 +115,10 @@ public class SearchService {
         search.removeUser(uid);
 
         broadcast(search.getId(), SearchEvent.LEAVE_USER, uid);
-
-        if (search.getUsers().isEmpty()) searches.remove(searchId);
+        if (search.getUsers().isEmpty()) {
+            searches.remove(searchId);
+            tree.get(search.getGame()).get(search.getAge()).get(search.getSize()).remove(search.getGender());
+        }
     }
 
     private void broadcast(UUID id, SearchEvent event, @Nullable Object payload) {

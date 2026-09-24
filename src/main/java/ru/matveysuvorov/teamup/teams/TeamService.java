@@ -1,6 +1,7 @@
 package ru.matveysuvorov.teamup.teams;
 
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import ru.matveysuvorov.teamup.auth.exceptions.UnauthorizedException;
@@ -9,6 +10,9 @@ import ru.matveysuvorov.teamup.chats.entities.ChatEntity;
 import ru.matveysuvorov.teamup.chats.entities.MemberEntity;
 import ru.matveysuvorov.teamup.chats.repositories.ChatRepository;
 import ru.matveysuvorov.teamup.chats.repositories.MemberRepository;
+import ru.matveysuvorov.teamup.games.GameEntity;
+import ru.matveysuvorov.teamup.games.GameRepository;
+import ru.matveysuvorov.teamup.games.exceptions.GameNotFoundException;
 import ru.matveysuvorov.teamup.storage.FileEntity;
 import ru.matveysuvorov.teamup.storage.FileRepository;
 import ru.matveysuvorov.teamup.storage.services.StorageService;
@@ -17,6 +21,9 @@ import ru.matveysuvorov.teamup.teams.dto.EditTeamRequest;
 import ru.matveysuvorov.teamup.teams.entities.InviteEntity;
 import ru.matveysuvorov.teamup.teams.exceptions.*;
 import ru.matveysuvorov.teamup.teams.repositories.InviteRepository;
+import ru.matveysuvorov.teamup.users.entities.UserEntity;
+import ru.matveysuvorov.teamup.users.exceptions.UserNotFoundException;
+import ru.matveysuvorov.teamup.users.repositories.UserRepository;
 
 import java.lang.reflect.Member;
 import java.time.Instant;
@@ -30,29 +37,33 @@ public class TeamService {
 
     private final ChatRepository chatRepository;
     private final MemberRepository memberRepository;
+    private final GameRepository gameRepository;
     private final ChatService chatService;
     private final InviteRepository inviteRepository;
     private final StorageService storageService;
     private final FileRepository fileRepository;
+    private final UserRepository userRepository;
 
     public TeamService(
             ChatRepository chatRepository,
-            MemberRepository memberRepository,
+            MemberRepository memberRepository, GameRepository gameRepository,
             ChatService chatService,
             InviteRepository inviteRepository,
             StorageService storageService,
-            FileRepository fileRepository
+            FileRepository fileRepository, UserRepository userRepository
     ) {
         this.chatRepository = chatRepository;
         this.memberRepository = memberRepository;
+        this.gameRepository = gameRepository;
         this.chatService = chatService;
         this.inviteRepository = inviteRepository;
         this.storageService = storageService;
         this.fileRepository = fileRepository;
+        this.userRepository = userRepository;
     }
 
     public List<ChatEntity> getPublicTeams() {
-        return chatRepository.findByIsPublic(true);
+        return chatRepository.findByIsPublic(true, Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
     public List<ChatEntity> getPrivateTeams(String uid) {
@@ -60,7 +71,7 @@ public class TeamService {
         return members.stream().map(MemberEntity::getChat).toList();
     }
 
-    public ChatEntity getTeam(String uid, Integer teamId) {
+    public ChatEntity getTeam(String uid, Long teamId) {
         if (!chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorized");
         return chatRepository.findById(teamId).orElseThrow(() -> new TeamNotFoundException("Team not found"));
     }
@@ -71,30 +82,45 @@ public class TeamService {
         team.setName(request.name());
         team.setIsTeam(true);
         team.setIsPublic(request.isPublic());
+
+        if (request.gameId() != null) {
+            GameEntity game = gameRepository.findById(request.gameId()).orElseThrow(() -> new GameNotFoundException("Game not found"));
+            team.setGame(game);
+        }
         team.setCreatedAt(Instant.now());
         chatRepository.save(team);
 
+        UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
         MemberEntity member = new MemberEntity();
         member.setChat(team);
-        member.setMemberId(uid);
+        member.setMember(user);
         member.setCreatedAt(Instant.now());
         memberRepository.save(member);
+
+        System.out.println(" -------- "+member.getId());
 
         return team;
     }
 
     @Transactional
-    public void editTeam(String uid, EditTeamRequest request) {
-        if (!chatService.isMember(uid, request.team_id())) throw new UnauthorizedException("Unauthorozed");
+    public ChatEntity editTeam(String uid, EditTeamRequest request) {
+        if (!chatService.isMember(uid, request.teamId())) throw new UnauthorizedException("Unauthorozed");
 
-        ChatEntity team = chatRepository.findById(request.team_id()).orElseThrow(() -> new TeamNotFoundException("Team not found"));
+        ChatEntity team = chatRepository.findById(request.teamId()).orElseThrow(() -> new TeamNotFoundException("Team not found"));
         team.setName(request.newName());
+
+        if (request.gameId() != null) {
+            GameEntity game = gameRepository.findById(request.gameId()).orElseThrow(() -> new GameNotFoundException("Game not found"));
+            team.setGame(game);
+        }
+
         chatRepository.save(team);
 
         for (String userId : request.addedMembers()) {
+            UserEntity user = userRepository.findByUid(userId).orElseThrow(() -> new UserNotFoundException("User not found"));
             MemberEntity member = new MemberEntity();
             member.setChat(team);
-            member.setMemberId(userId);
+            member.setMember(user);
             member.setCreatedAt(Instant.now());
             memberRepository.save(member);
         }
@@ -102,37 +128,39 @@ public class TeamService {
         for (String userId : request.removedMembers()) {
             memberRepository.deleteByChatIdAndMemberId(team.getId(), userId);
         }
+
+        return team;
     }
 
     @Transactional
-    public void deleteTeam(String uid, Integer teamId) {
+    public void deleteTeam(String uid, Long teamId) {
         if (!chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorozed");
         if (chatRepository.countById(teamId) != 1) throw new TooManyMembersException("Too many members of team to delete");
 
         ChatEntity team = chatRepository.findById(teamId).orElseThrow(() -> new TeamNotFoundException("Team not found"));
-        chatRepository.delete(team);
 
-        MemberEntity member = memberRepository.findByChatAndMemberId(team, uid).orElseThrow(() -> new MemberNotFoundException("Member not found"));
-        memberRepository.delete(member);
+        memberRepository.deleteByChatId(teamId);
+        chatRepository.delete(team);
     }
 
     @Transactional
-    public void addMembers(String uid, List<String> memberIds, Integer teamId) {
+    public void addMembers(String uid, List<String> memberIds, Long teamId) {
         if (!chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorozed");
         ChatEntity team = getTeam(uid, teamId);
 
         for (String memberId : memberIds) {
             if (memberId == uid) continue;
+            UserEntity user = userRepository.findByUid(memberId).orElseThrow(() -> new UserNotFoundException("User not found"));
             MemberEntity member = new MemberEntity();
             member.setChat(team);
-            member.setMemberId(memberId);
+            member.setMember(user);
             member.setCreatedAt(Instant.now());
             memberRepository.save(member);
         }
 
     }
 
-    public String getInviteLink(String uid, Integer teamId) {
+    public String getInviteLink(String uid, Long teamId) {
         if (!chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorozed");
         if (!chatRepository.existsById(teamId)) throw new TeamNotFoundException("Team not found");
 
@@ -146,18 +174,21 @@ public class TeamService {
         return "https://teamupp.ru/invite/"+teamId+"/"+number;
     }
 
-    public void acceptInvitation(String uid, Integer teamId, Integer number) {
+    public void acceptInvitation(String uid, Long teamId, Integer number) {
         InviteEntity invite = inviteRepository.findByTeamIdAndNumber(teamId, number).orElseThrow(() -> new InviteNotFoundException("Invite not found"));
         if (invite.getExpiredAt().isBefore(Instant.now())) throw new InviteExpiredException("Invite expired");
+
         ChatEntity team = chatRepository.findById(teamId).orElseThrow(() -> new TeamNotFoundException("Team not found"));
+
+        UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
         MemberEntity member = new MemberEntity();
         member.setChat(team);
-        member.setMemberId(uid);
+        member.setMember(user);
         member.setCreatedAt(Instant.now());
         memberRepository.save(member);
     }
 
-    public void uploadIcon(String uid, Integer teamId, MultipartFile file) {
+    public void uploadIcon(String uid, Long teamId, MultipartFile file) {
         if (!chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorized");
 
         UUID id = UUID.randomUUID();
@@ -179,7 +210,7 @@ public class TeamService {
         }
     }
 
-    public String getIconUrl(String uid, Integer teamId) {
+    public String getIconUrl(String uid, Long teamId) {
         ChatEntity team = chatRepository.findById(teamId).orElseThrow(() -> new TeamNotFoundException("Team not found"));
         if (!team.isPublic() && !chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorized");
         if (team.getIcon() == null) throw new IconNotFoundException("Team doesn't have an icon");

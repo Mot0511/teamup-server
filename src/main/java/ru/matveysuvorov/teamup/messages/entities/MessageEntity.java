@@ -13,7 +13,7 @@ public class MessageEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name="id")
-    private Integer id;
+    private Long id;
 
     @Column(name="user_id", nullable = false)
     private String uid;
@@ -35,11 +35,11 @@ public class MessageEntity {
     @Column(name="sended_at", nullable = false)
     private Instant sendedAt;
 
-    public Integer getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
