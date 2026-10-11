@@ -171,7 +171,6 @@ public class AuthService {
     @Transactional
     public String discordAuth(DiscordAuthRequest request) throws IOException, InterruptedException {
         DiscordUser discordUser = discordAuthService.verify(request.code());
-
         if (providerAccountRepository.existsByProviderUserId(discordUser.user_id())) {
             ProviderAccountEntity providerAccount = providerAccountRepository.findByProviderUserId(discordUser.user_id());
 

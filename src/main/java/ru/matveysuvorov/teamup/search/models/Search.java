@@ -32,7 +32,7 @@ public class Search {
     }
 
     public void removeUser(String uid) {
-        users = users.stream().filter(user -> !user.getUid().equals(uid)).toList();
+        users.removeIf(user -> user.getUid().equals(uid));
     }
 
     public void setUsers(List<UserEntity> users) {

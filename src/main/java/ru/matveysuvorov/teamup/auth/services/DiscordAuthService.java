@@ -3,7 +3,9 @@ package ru.matveysuvorov.teamup.auth.services;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import ru.matveysuvorov.teamup.auth.dto.DiscordUser;
 import ru.matveysuvorov.teamup.auth.exceptions.UnauthorizedException;
 
@@ -49,12 +51,12 @@ public class DiscordAuthService {
     }
 
     private String exchangeCode(String code) throws IOException, InterruptedException {
+
         String form = "grant_type=authorization_code"
                 + "&code=" + encode(code)
                 + "&client_id=" + encode(clientId)
                 + "&client_secret=" + encode(clientSecret)
                 + "&redirect_uri=" + encode(redirectUri);
-
         HttpRequest request = HttpRequest.newBuilder(URI.create(TOKEN_URL))
                 .timeout(Duration.ofSeconds(10))
                 .header("Content-Type", "application/x-www-form-urlencoded")
@@ -62,10 +64,11 @@ public class DiscordAuthService {
                 .build();
 
         JsonNode json = readJson(request, "Failed to exchange discord code");
+        System.out.println(json);
         JsonNode accessToken = json.get("access_token");
 
         if (accessToken == null || accessToken.asText().isBlank()) {
-            throw new UnauthorizedException("Discord did not return access token");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Discord did not return access token");
         }
 
         return accessToken.asText();
@@ -99,7 +102,13 @@ public class DiscordAuthService {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new UnauthorizedException(message + ": " + response.body());
+            HttpStatus status = response.statusCode() >= 500
+                    ? HttpStatus.BAD_GATEWAY
+                    : HttpStatus.BAD_REQUEST;
+            throw new ResponseStatusException(
+                    status,
+                    message + ": " + response.body()
+            );
         }
 
         return objectMapper.readTree(response.body());

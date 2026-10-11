@@ -79,7 +79,7 @@ public class FcmService {
                     toUser.getUid(),
                     "Новая заявка в друзья",
                     fromUser.getUsername() + " хочет добавить вас в друзья",
-                    Map.of("type", "friend_request", "fromUser", toUser.getUid())
+                    Map.of("type", "friend_request", "fromUser", fromUser.getUid())
             );
         }
     }

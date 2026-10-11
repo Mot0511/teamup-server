@@ -45,6 +45,8 @@ public class SearchService {
     }
 
     public SearchResponse getSearch(String uid, SearchRequest request) {
+        System.out.println(request);
+        System.out.println(tree);
         Map<Integer, Map<Integer, Map<String, Search>>> gameBranch = tree.get(request.game());
         if (gameBranch == null) return createSearch(uid, request);
         Map<Integer, Map<String, Search>> ageBranch = gameBranch.get(request.age());
@@ -54,26 +56,28 @@ public class SearchService {
         Search search = teamSizeBranch.get(request.gender());
         if (search == null) return createSearch(uid, request);
 
-
         UserEntity user = userService.getUser(uid);
         search.addUser(user);
 
         broadcast(search.getId(), SearchEvent.NEW_USER, user);
 
-        if (search.getUsers().size() == search.getSize()) {
+        if (search.getUsers().size() >= search.getSize()) {
             ChatEntity team = teamService.addTeam(
                     uid,
                     new AddTeamRequest(
                             "Быстрая команда",
-                            true,
+                            false,
                             request.game()
                     )
             );
-            teamService.addMembers(uid, search.getUsers().stream().map(UserEntity::getUid).toList(), team.getId());
+            teamService.addMembers(uid, search.getUsers().stream().map(UserEntity::getUid).filter(user_id -> !user_id.equals(uid)).toList(), team.getId());
             broadcast(search.getId(), SearchEvent.FORMED, team);
 
             List<UserEntity> memberUids = search.getUsers();
             fcmService.sendSearchCompleteNotification(memberUids);
+
+            searches.remove(search.getId());
+            tree.get(search.getGame()).get(search.getAge()).get(search.getSize()).remove(search.getGender());
 
             return new SearchFormedResponse(team);
         }

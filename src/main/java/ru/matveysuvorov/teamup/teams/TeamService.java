@@ -161,8 +161,8 @@ public class TeamService {
     }
 
     public String getInviteLink(String uid, Long teamId) {
-        if (!chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorozed");
         if (!chatRepository.existsById(teamId)) throw new TeamNotFoundException("Team not found");
+        if (!chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorozed");
 
         int number = (int) (Math.random() * 1000000);
         InviteEntity invite = inviteRepository.findByTeamId(teamId).orElse(new InviteEntity());
@@ -171,10 +171,10 @@ public class TeamService {
         invite.setExpiredAt(Instant.now().plus(1, ChronoUnit.HOURS));
         inviteRepository.save(invite);
 
-        return "https://teamupp.ru/invite/"+teamId+"/"+number;
+        return "https://192.168.0.71:3000/invite/"+teamId+"/"+number;
     }
 
-    public void acceptInvitation(String uid, Long teamId, Integer number) {
+    public ChatEntity acceptInvitation(String uid, Long teamId, Integer number) {
         InviteEntity invite = inviteRepository.findByTeamIdAndNumber(teamId, number).orElseThrow(() -> new InviteNotFoundException("Invite not found"));
         if (invite.getExpiredAt().isBefore(Instant.now())) throw new InviteExpiredException("Invite expired");
 
@@ -186,6 +186,8 @@ public class TeamService {
         member.setMember(user);
         member.setCreatedAt(Instant.now());
         memberRepository.save(member);
+
+        return team;
     }
 
     public void uploadIcon(String uid, Long teamId, MultipartFile file) {

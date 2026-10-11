@@ -76,5 +76,22 @@ public class TeamController {
         return teamService.getIconUrl(auth.getName(), teamId);
     }
 
+    @GetMapping("/{teamId}/invitation")
+    public String getInviteLink(
+            Authentication auth,
+            @PathVariable Long teamId
+    ) {
+        return teamService.getInviteLink(auth.getName(), teamId);
+    }
+
+    @PostMapping("/{teamId}/invitaiton/{inviteNumber}/accept")
+    public ChatEntity acceptInvitation(
+            Authentication auth,
+            @PathVariable Long teamId,
+            @PathVariable Integer inviteNumber
+    ) {
+        return teamService.acceptInvitation(auth.getName(), teamId, inviteNumber);
+    }
+
 
 }

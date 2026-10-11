@@ -1,5 +1,6 @@
 package ru.matveysuvorov.teamup.users;
 
+import jakarta.transaction.Transactional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -25,6 +26,7 @@ import ru.matveysuvorov.teamup.users.repositories.UserRepository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -137,6 +139,7 @@ public class UserService {
         friendshipRepository.save(friendship);
     }
 
+    @Transactional
     public void deleteFriendship(String fromUser, String toUser) {
         if (!userRepository.existsByUid(fromUser) || !userRepository.existsByUid(toUser)) {
             throw new UserNotFoundException("Users not found");
@@ -203,7 +206,8 @@ public class UserService {
     }
 
     public boolean isUsernameExists(String username) {
-        return userRepository.existsByUsername(username);
+        Optional<UserEntity> user = userRepository.findByUsername(username);
+        return user.isPresent();
     }
 
     public boolean isEmailExists(String email) {
