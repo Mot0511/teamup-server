@@ -21,8 +21,10 @@ import ru.matveysuvorov.teamup.teams.dto.EditTeamRequest;
 import ru.matveysuvorov.teamup.teams.entities.InviteEntity;
 import ru.matveysuvorov.teamup.teams.exceptions.*;
 import ru.matveysuvorov.teamup.teams.repositories.InviteRepository;
+import ru.matveysuvorov.teamup.users.entities.FriendshipEntity;
 import ru.matveysuvorov.teamup.users.entities.UserEntity;
 import ru.matveysuvorov.teamup.users.exceptions.UserNotFoundException;
+import ru.matveysuvorov.teamup.users.repositories.FriendshipRepository;
 import ru.matveysuvorov.teamup.users.repositories.UserRepository;
 
 import java.lang.reflect.Member;
@@ -43,6 +45,7 @@ public class TeamService {
     private final StorageService storageService;
     private final FileRepository fileRepository;
     private final UserRepository userRepository;
+    private final FriendshipRepository friendshipRepository;
 
     public TeamService(
             ChatRepository chatRepository,
@@ -50,7 +53,7 @@ public class TeamService {
             ChatService chatService,
             InviteRepository inviteRepository,
             StorageService storageService,
-            FileRepository fileRepository, UserRepository userRepository
+            FileRepository fileRepository, UserRepository userRepository, FriendshipRepository friendshipRepository
     ) {
         this.chatRepository = chatRepository;
         this.memberRepository = memberRepository;
@@ -60,6 +63,7 @@ public class TeamService {
         this.storageService = storageService;
         this.fileRepository = fileRepository;
         this.userRepository = userRepository;
+        this.friendshipRepository = friendshipRepository;
     }
 
     public List<ChatEntity> getPublicTeams() {
@@ -90,14 +94,21 @@ public class TeamService {
         team.setCreatedAt(Instant.now());
         chatRepository.save(team);
 
-        UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
-        MemberEntity member = new MemberEntity();
-        member.setChat(team);
-        member.setMember(user);
-        member.setCreatedAt(Instant.now());
-        memberRepository.save(member);
+        List<FriendshipEntity> friendships = friendshipRepository.findByFromUserOrToUser(uid, uid).orElseThrow(() -> new UserNotFoundException("Friends not found"));
+        List<String> friends = friendships
+                .stream()
+                .map((friendshipEntity -> friendshipEntity.getFromUser().equals(uid) ? friendshipEntity.getToUser() : friendshipEntity.getFromUser())).toList();
 
-        System.out.println(" -------- "+member.getId());
+        for (String member_id : request.members()) {
+            if (friends.contains(member_id) || member_id.equals(uid)) {
+                UserEntity user = userRepository.findByUid(member_id).orElseThrow(() -> new UserNotFoundException("User not found"));
+                MemberEntity member = new MemberEntity();
+                member.setChat(team);
+                member.setMember(user);
+                member.setCreatedAt(Instant.now());
+                memberRepository.save(member);
+            }
+        }
 
         return team;
     }
@@ -207,8 +218,14 @@ public class TeamService {
             fileEntity.setContentType(file.getContentType());
             fileEntity.setUploadedAt(Instant.now());
             fileRepository.save(fileEntity);
+
+            ChatEntity team = chatRepository.findById(teamId).orElseThrow(() -> new TeamNotFoundException("Team not found"));
+            team.setIcon(fileEntity);
+            chatRepository.save(team);
+            System.out.println("Team icon uploaded");
         } catch (Exception e) {
             storageService.delete(key);
+            throw e;
         }
     }
 
@@ -217,6 +234,7 @@ public class TeamService {
         if (!team.isPublic() && !chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorized");
         if (team.getIcon() == null) throw new IconNotFoundException("Team doesn't have an icon");
 
-        return storageService.getPresignedUrl(team.getIcon().getStorageKey());
+        String url = storageService.getPresignedUrl(team.getIcon().getStorageKey());
+        return url;
     }
 }

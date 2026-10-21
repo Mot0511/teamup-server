@@ -24,7 +24,7 @@ public class RealtimeEventListener {
     @EventListener
     public void handleConnect(SessionConnectEvent event) {
         Principal principal = event.getUser();
-        if (principal == null) return;
+        if (principal == null || "anonymousUser".equals(principal.getName())) return;
 
         String uid = principal.getName();
         userService.setOnlineStatus(uid, true);
@@ -34,7 +34,7 @@ public class RealtimeEventListener {
     @EventListener
     public void handleDisconnect(SessionDisconnectEvent event) {
         Principal principal = event.getUser();
-        if (principal == null) return;
+        if (principal == null || "anonymousUser".equals(principal.getName())) return;
 
         String uid = principal.getName();
         userService.setOnlineStatus(uid, false);

@@ -79,8 +79,11 @@ public class UserService {
         user.setAge(userdata.age());
         user.setGender(userdata.gender());
 
-        GameEntity game = gameRepository.findById(userdata.game()).orElseThrow(() -> new GameNotFoundException("Game not found"));
-        user.setFavouriteGame(game);
+        if (userdata.game() != null) {
+            GameEntity game = gameRepository.findById(userdata.game()).orElseThrow(() -> new GameNotFoundException("Game not found"));
+            user.setFavouriteGame(game);
+        }
+
         user.setOnline(false);
 
         userRepository.save(user);
@@ -164,6 +167,7 @@ public class UserService {
         return userRepository.findAll(PageRequest.of(page, limit)).getContent();
     }
 
+    @Transactional
     public void uploadAvatar(String uid, MultipartFile file) {
         if (!fileRepository.existsByUploaderId(uid)) {
             UUID id = UUID.randomUUID();
@@ -181,7 +185,11 @@ public class UserService {
                 fileEntity.setUploadedAt(Instant.now());
                 fileEntity.setSize(file.getSize());
 
-                fileRepository.save(fileEntity);
+                FileEntity saved = fileRepository.save(fileEntity);
+                UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
+                user.setAvatar(saved.getId());
+                userRepository.save(user);
+
             } catch (Exception e) {
                 storageService.delete(key);
             }
@@ -208,9 +216,5 @@ public class UserService {
     public boolean isUsernameExists(String username) {
         Optional<UserEntity> user = userRepository.findByUsername(username);
         return user.isPresent();
-    }
-
-    public boolean isEmailExists(String email) {
-        return userRepository.existsByEmail(email);
     }
 }

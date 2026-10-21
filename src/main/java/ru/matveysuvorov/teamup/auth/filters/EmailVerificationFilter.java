@@ -4,9 +4,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import ru.matveysuvorov.teamup.auth.entities.AccountEntity;
 import ru.matveysuvorov.teamup.auth.repositories.AccountRepository;
@@ -14,7 +14,6 @@ import ru.matveysuvorov.teamup.auth.repositories.AccountRepository;
 import java.io.IOException;
 import java.util.UUID;
 
-@Component
 public class EmailVerificationFilter extends OncePerRequestFilter {
 
     private final AccountRepository accountRepository;
@@ -32,7 +31,9 @@ public class EmailVerificationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated()) {
+        if (auth != null && auth.isAuthenticated()
+                && !(auth instanceof AnonymousAuthenticationToken)
+                && !"anonymousUser".equals(auth.getName())) {
             UUID uid = UUID.fromString(auth.getName());
 
             AccountEntity account = accountRepository.findById(uid).orElse(null);

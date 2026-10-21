@@ -1,6 +1,7 @@
 package ru.matveysuvorov.teamup.storage;
 
 import jakarta.persistence.*;
+import org.springframework.web.bind.annotation.GetMapping;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -11,6 +12,7 @@ public class FileEntity {
 
     @Id
     @Column(name="id")
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name="storage_key", nullable = false, unique = true)

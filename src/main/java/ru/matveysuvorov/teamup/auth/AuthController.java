@@ -23,11 +23,10 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public String register(
+    public AuthResponse register(
             @RequestBody RegisterRequest request
     ) {
-        authService.register(request);
-        return "Please, check your email for verification!";
+        return authService.register(request);
     }
 
     @GetMapping("/me")
@@ -59,11 +58,18 @@ public class AuthController {
         return authService.discordAuth(request);
     }
 
-    @GetMapping("/verify-email")
+    @PostMapping("/verify-email")
     public AuthResponse verifyEmail(
-            @RequestParam String token
+            @RequestBody VerifyEmailRequest request
     ) {
-        return authService.verifyEmail(token);
+        return authService.verifyEmail(request.code());
+    }
+
+    @PostMapping("/resend-verification-code")
+    public void resendVerificationCode(
+            @RequestBody ResendVerificationCodeRequest request
+    ) {
+        authService.sendVerificationCode(request.email());
     }
 
     @PostMapping("/forgot")
@@ -92,7 +98,7 @@ public class AuthController {
     public boolean isEmailExists(
             @PathVariable String email
     ) {
-        return userService.isEmailExists(email);
+        return authService.isEmailExists(email);
     }
 
 }

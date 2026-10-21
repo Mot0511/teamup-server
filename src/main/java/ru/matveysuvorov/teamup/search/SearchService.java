@@ -67,10 +67,10 @@ public class SearchService {
                     new AddTeamRequest(
                             "Быстрая команда",
                             false,
-                            request.game()
+                            request.game(),
+                            search.getUsers().stream().map(UserEntity::getUid).toList()
                     )
             );
-            teamService.addMembers(uid, search.getUsers().stream().map(UserEntity::getUid).filter(user_id -> !user_id.equals(uid)).toList(), team.getId());
             broadcast(search.getId(), SearchEvent.FORMED, team);
 
             List<UserEntity> memberUids = search.getUsers();

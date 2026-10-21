@@ -37,6 +37,9 @@ public class MessageInterceptor implements ChannelInterceptor {
         if (accessor == null) return message;
 
         Principal auth = accessor.getUser();
+        if (auth == null || "anonymousUser".equals(auth.getName())) {
+            throw new UnauthorizedException("Unauthorized");
+        }
 
         String destination = accessor.getDestination();
         if (destination == null) return message;

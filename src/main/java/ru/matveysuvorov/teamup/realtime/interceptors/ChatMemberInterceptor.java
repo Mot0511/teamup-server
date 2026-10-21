@@ -42,7 +42,9 @@ public class ChatMemberInterceptor implements ChannelInterceptor {
         if (accessor == null) return message;
 
         Principal auth = accessor.getUser();
-        if (auth == null) throw new UnauthorizedException("Unauthorized");
+        if (auth == null || "anonymousUser".equals(auth.getName())) {
+            throw new UnauthorizedException("Unauthorized");
+        }
 
         String uid = auth.getName();
 

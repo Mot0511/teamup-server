@@ -24,10 +24,9 @@ public class EmailService {
         this.templateEngine = templateEngine;
     }
 
-    public void sendVerificationEmail(String email, String token) {
-        String verificationUrl = "https://api.teamupp.ru/auth/verify-email?token="+token;
+    public void sendVerificationEmail(String email, Number code) {
         Context context = new Context();
-        context.setVariable("verificationUrl", verificationUrl);
+        context.setVariable("verificationCode", code);
         String html = templateEngine.process("email/verification", context);
         MimeMessage message = mailSender.createMimeMessage();
 

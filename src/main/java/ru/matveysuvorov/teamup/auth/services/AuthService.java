@@ -2,21 +2,17 @@ package ru.matveysuvorov.teamup.auth.services;
 
 import jakarta.transaction.Transactional;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.checkerframework.checker.units.qual.A;
-import org.springframework.data.repository.cdi.Eager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import ru.matveysuvorov.teamup.auth.entities.AccountEntity;
-import ru.matveysuvorov.teamup.auth.entities.EmailVerificationTokenEntity;
-import ru.matveysuvorov.teamup.auth.entities.ProviderAccountEntity;
-import ru.matveysuvorov.teamup.auth.entities.ResetPasswordTokenEntity;
+import ru.matveysuvorov.teamup.auth.entities.*;
 import ru.matveysuvorov.teamup.auth.exceptions.AccountNotFound;
 import ru.matveysuvorov.teamup.auth.exceptions.UnauthorizedException;
+import ru.matveysuvorov.teamup.auth.exceptions.WrongVerificationCode;
 import ru.matveysuvorov.teamup.auth.repositories.AccountRepository;
 import ru.matveysuvorov.teamup.auth.dto.*;
-import ru.matveysuvorov.teamup.auth.repositories.EmailVerificationTokenRepository;
+import ru.matveysuvorov.teamup.auth.repositories.EmailVerificationCodeRepository;
 import ru.matveysuvorov.teamup.auth.repositories.ProviderAccountRepository;
 import ru.matveysuvorov.teamup.auth.repositories.ResetPasswordTokenRepository;
 import ru.matveysuvorov.teamup.security.JwtService;
@@ -27,6 +23,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Random;
 import java.util.UUID;
 
 @Service
@@ -38,7 +35,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final GoogleAuthService googleAuthService;
     private final DiscordAuthService discordAuthService;
-    private final EmailVerificationTokenRepository emailTokenRepository;
+    private final EmailVerificationCodeRepository emailCodeRepository;
     private final ResetPasswordTokenRepository resetPasswordTokenRepository;
     private final EmailService emailService;
 
@@ -49,7 +46,7 @@ public class AuthService {
             GoogleAuthService googleAuthService,
             DiscordAuthService discordAuthService,
             ProviderAccountRepository providerAccountRepository,
-            EmailVerificationTokenRepository emailVerificationTokenRepository,
+            EmailVerificationCodeRepository emailVerificationCodeRepository,
             ResetPasswordTokenRepository resetPasswordTokenRepository,
             EmailService emailService
     ) {
@@ -59,13 +56,13 @@ public class AuthService {
         this.googleAuthService = googleAuthService;
         this.discordAuthService = discordAuthService;
         this.providerAccountRepository = providerAccountRepository;
-        this.emailTokenRepository = emailVerificationTokenRepository;
+        this.emailCodeRepository = emailVerificationCodeRepository;
         this.resetPasswordTokenRepository = resetPasswordTokenRepository;
         this.emailService = emailService;
     }
 
     @Transactional
-    public void register(RegisterRequest request) {
+    public AuthResponse register(RegisterRequest request) {
         if (accountRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
@@ -76,21 +73,34 @@ public class AuthService {
         account.setEnabled(true);
         account.setIsEmailConfirmed(false);
         account.setCraetedAt(Instant.now());
-
         accountRepository.save(account);
 
-        String verificationToken = UUID.randomUUID().toString();
-        String tokenHash = DigestUtils.sha256Hex(verificationToken);
-        emailTokenRepository.deleteAllByAccountId(account.getId());
-        EmailVerificationTokenEntity verificationEntity = new EmailVerificationTokenEntity();
-        verificationEntity.setAccount(account);
-        verificationEntity.setTokenHash(tokenHash);
-        verificationEntity.setCreatedAt(Instant.now());
-        verificationEntity.setExpiredAt(Instant.now().plus(24, ChronoUnit.HOURS));
+        sendVerificationCode(account);
 
-        emailTokenRepository.save(verificationEntity);
+        String token = jwtService.generateToken(account.getId());
+        return new AuthResponse(token, "Bearer");
+    }
 
-        emailService.sendVerificationEmail(account.getEmail(), verificationToken);
+    public void sendVerificationCode(AccountEntity account) {
+        Random random = new Random();
+        Number verificationCode = 100000 + random.nextInt(900000);
+
+        EmailVerificationCodeEntity codeEntity = emailCodeRepository
+                .findByAccountId(account.getId())
+                .orElse(new EmailVerificationCodeEntity());
+
+        codeEntity.setAccount(account);
+        codeEntity.setCode(verificationCode);
+        codeEntity.setCreatedAt(Instant.now());
+        codeEntity.setExpiredAt(Instant.now().plus(24, ChronoUnit.HOURS));
+        emailCodeRepository.save(codeEntity);
+
+        emailService.sendVerificationEmail(account.getEmail(), verificationCode);
+    }
+
+    public void sendVerificationCode(String email) {
+        AccountEntity account = accountRepository.findByEmail(email).orElseThrow(() -> new AccountNotFound("Accocunt not found"));
+        sendVerificationCode(account);
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -111,30 +121,28 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse verifyEmail(String token) {
-        String tokenHash = DigestUtils.sha256Hex(token);
-        EmailVerificationTokenEntity verification = emailTokenRepository
-                .findByTokenHash(tokenHash)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid verification token"));
+    public AuthResponse verifyEmail(Number code) {
+        EmailVerificationCodeEntity verification = emailCodeRepository
+                .findByCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid verification code"));
 
-        if (verification.getUsedAt() != null) {
-            throw new IllegalArgumentException("Token already used");
-        }
 
         if (verification.getExpiredAt().isBefore(Instant.now())) {
             throw new IllegalArgumentException("Token expried");
         }
 
+        if (!verification.getCode().equals(code)) {
+            throw new WrongVerificationCode("Wrong verification code");
+        }
+
         AccountEntity account = verification.getAccount();
         account.setIsEmailConfirmed(true);
 
-        verification.setUsedAt(Instant.now());
-
+        emailCodeRepository.delete(verification);
         accountRepository.save(account);
-        emailTokenRepository.save(verification);
 
-        String accessToken = jwtService.generateToken(account.getId());
-        return new AuthResponse(accessToken, "Bearer");
+        String accessToken = jwtService.generateToken(account.getId()); return new AuthResponse(accessToken, "Bearer");
+
     }
 
     public AuthResponse googleAuth(GoogleAuthRequest request) throws IOException, GeneralSecurityException {
@@ -233,8 +241,13 @@ public class AuthService {
         accountRepository.save(account);
    }
 
-    public AccountEntity getAccount(String uid) throws AccountNotFoundException {
-        AccountEntity account = accountRepository.findById(UUID.fromString(uid)).orElseThrow(() -> new AccountNotFoundException("Account not found"));
+    public AccountEntity getAccount(String uid) {
+        System.out.println(uid);
+        AccountEntity account = accountRepository.findById(UUID.fromString(uid)).orElseThrow(() -> new AccountNotFound("Account not found"));
         return account;
+    }
+
+    public boolean isEmailExists(String email) {
+        return accountRepository.existsByEmail(email);
     }
 }

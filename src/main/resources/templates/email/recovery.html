@@ -1,26 +1,33 @@
-<div>
-    <h2>Восстановление пароля на <span style="color: #016335">Teamup</span></h2>
-    <p>Чтобы сбросить пароль, нажми на кнопку ниже:</p>
-    <a 
-        class="button" 
-        th:href="${recoveryUrl}"
-        style="
-        background-color: #016335; 
-        color: white; 
-        padding: 10px 20px; 
-        text-decoration: none;
-        transition: 0.3s all;
-        border-radius: 10px;
-        "
-        
-    >Сбросить пароль</a>
-    <br />
-    <br />
-    <p>Если ты не собирался сбрасывать пароль, просто забей на это письмо. И на кнопку не нажимай!</p>
-</div>
-<style>
-    * {
-        font-family: 'Arial', sans-serif;
-        
-    }
-</style>
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            font-family: 'Arial', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h2>Восстановление пароля на <span style="color: #016335">Teamup</span></h2>
+        <p>Чтобы сбросить пароль, нажми на кнопку ниже:</p>
+        <a 
+            class="button" 
+            th:href="${recoveryUrl}"
+            style="
+            background-color: #016335; 
+            color: white; 
+            padding: 10px 20px; 
+            text-decoration: none;
+            transition: 0.3s all;
+            border-radius: 10px;
+            "
+            
+        >Сбросить пароль</a>
+        <br />
+        <br />
+        <p>Если ты не собирался сбрасывать пароль, просто забей на это письмо. И на кнопку не нажимай!</p>
+    </div>
+</body>
+</html>
