@@ -167,9 +167,10 @@ public class UserService {
         return userRepository.findAll(PageRequest.of(page, limit)).getContent();
     }
 
-    @Transactional
     public void uploadAvatar(String uid, MultipartFile file) {
-        if (!fileRepository.existsByUploaderId(uid)) {
+        UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        if (user.getAvatar() == null) {
             UUID id = UUID.randomUUID();
             String key = "avatars/"+id;
 
@@ -185,25 +186,26 @@ public class UserService {
                 fileEntity.setUploadedAt(Instant.now());
                 fileEntity.setSize(file.getSize());
 
-                FileEntity saved = fileRepository.save(fileEntity);
-                UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
-                user.setAvatar(saved.getId());
+                fileRepository.save(fileEntity);
+                user.setAvatar(id);
                 userRepository.save(user);
 
             } catch (Exception e) {
                 storageService.delete(key);
+                throw e;
             }
 
             return;
         }
 
-        FileEntity fileEntity = fileRepository.findByUploaderId(uid).orElseThrow(() -> new FileNotFoundException("Avatar not found"));
+        FileEntity fileEntity = fileRepository.findById(user.getAvatar()).orElseThrow(() -> new FileNotFoundException("Avatar not found"));
         String key = fileEntity.getStorageKey();
         storageService.upload(file, key);
     }
 
     public String getAvatarUrl(String uid) {
-        FileEntity fileEntity = fileRepository.findByUploaderId(uid).orElseThrow(() -> new AvatarNotExists("User doesn't have avatar"));
+        UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
+        FileEntity fileEntity = fileRepository.findById(user.getAvatar()).orElseThrow(() -> new AvatarNotExists("User doesn't have avatar"));
         return storageService.getPresignedUrl(fileEntity.getStorageKey());
     }
 

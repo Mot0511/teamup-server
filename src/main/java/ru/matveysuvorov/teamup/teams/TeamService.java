@@ -211,6 +211,7 @@ public class TeamService {
 
         try {
             FileEntity fileEntity = new FileEntity();
+            fileEntity.setId(UUID.randomUUID());
             fileEntity.setUploaderId(uid);
             fileEntity.setStorageKey(key);
             fileEntity.setOriginalFilename(file.getOriginalFilename());

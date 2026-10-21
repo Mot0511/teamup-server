@@ -12,7 +12,6 @@ public class FileEntity {
 
     @Id
     @Column(name="id")
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name="storage_key", nullable = false, unique = true)

@@ -9,6 +9,8 @@ public interface FileRepository extends JpaRepository<FileEntity, Integer> {
 
     Optional<FileEntity> findById(UUID id);
     Optional<FileEntity> findByUploaderId(String uploaderId);
+    Optional<FileEntity> findByStorageKey(String key);
     boolean existsByUploaderId(String uploaderId);
+    boolean existsById(UUID id);
 
 }
