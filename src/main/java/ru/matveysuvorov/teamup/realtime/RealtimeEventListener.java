@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import ru.matveysuvorov.teamup.users.UserService;
+import ru.matveysuvorov.teamup.users.exceptions.UserNotFoundException;
 
 import java.security.Principal;
 
@@ -27,7 +28,9 @@ public class RealtimeEventListener {
         if (principal == null || "anonymousUser".equals(principal.getName())) return;
 
         String uid = principal.getName();
-        userService.setOnlineStatus(uid, true);
+//        try {
+//            userService.setOnlineStatus(uid, true);
+//        } catch (UserNotFoundException e) {}
         messagingTemplate.convertAndSend("/topic/user/"+uid+"/status", true);
     }
 

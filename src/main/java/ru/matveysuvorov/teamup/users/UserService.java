@@ -70,7 +70,6 @@ public class UserService {
         if (userRepository.existsByUsername(userdata.username())) {
             throw new BadCredentialsException("Username already exists");
         }
-
         UserEntity user = new UserEntity();
         user.setUid(account.getId().toString());
         user.setEmail(account.getEmail());
@@ -83,6 +82,7 @@ public class UserService {
             GameEntity game = gameRepository.findById(userdata.game()).orElseThrow(() -> new GameNotFoundException("Game not found"));
             user.setFavouriteGame(game);
         }
+        System.out.println("5");
 
         user.setOnline(false);
 
