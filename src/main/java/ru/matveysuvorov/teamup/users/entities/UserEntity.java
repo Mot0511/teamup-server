@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import ru.matveysuvorov.teamup.games.GameEntity;
 import ru.matveysuvorov.teamup.storage.FileEntity;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -41,6 +42,9 @@ public class UserEntity {
 
     @Column(name="avatar_id")
     private UUID avatar_id;
+
+    @Column(name="created_at")
+    private Instant createdAt;
 
     public String getUid() {
         return uid;
@@ -124,5 +128,13 @@ public class UserEntity {
 
     public void setAvatar(UUID avatar_id) {
         this.avatar_id = avatar_id;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
     }
 }

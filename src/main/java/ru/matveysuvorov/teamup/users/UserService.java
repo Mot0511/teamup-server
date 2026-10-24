@@ -1,5 +1,6 @@
 package ru.matveysuvorov.teamup.users;
 
+import org.springframework.data.domain.Sort;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -60,6 +61,10 @@ public class UserService {
         System.out.println(user);
         return user;
     };
+
+    public List<UserEntity> getUsers(Integer page, Integer limit) {
+        return userRepository.findAll(PageRequest.of(page, limit, Sort.by(Sort.Direction.DESC, "createdAt"))).getContent();
+    }
 
     public UserEntity create(String uid, CreateUserRequest userdata) {
         AccountEntity account = accountRepository.findById(UUID.fromString(uid)).orElseThrow(() -> new BadCredentialsException("Account not found"));
@@ -161,10 +166,6 @@ public class UserService {
         UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
         user.setOnline(status);
         userRepository.save(user);
-    }
-
-    public List<UserEntity> getUsers(Integer page, Integer limit) {
-        return userRepository.findAll(PageRequest.of(page, limit)).getContent();
     }
 
     public void uploadAvatar(String uid, MultipartFile file) {

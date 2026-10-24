@@ -35,3 +35,4 @@ build/
 !**/src/resources/application.properties
 !**/src/resources/certs
 src/main/resources/firebase/
+backups/
