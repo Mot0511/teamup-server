@@ -1,5 +1,8 @@
 package ru.matveysuvorov.teamup.teams;
 
+import com.google.rpc.context.AttributeContext;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -9,6 +12,7 @@ import ru.matveysuvorov.teamup.teams.dto.AddTeamRequest;
 import ru.matveysuvorov.teamup.teams.dto.EditTeamRequest;
 import ru.matveysuvorov.teamup.users.entities.UserEntity;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -34,6 +38,15 @@ public class TeamController {
     ) {
         return teamService.getPrivateTeams(auth.getName());
      }
+
+
+    @GetMapping("/{teamId}")
+    public ChatEntity getTeam(
+            Authentication auth,
+            @PathVariable Long teamId
+    ) {
+        return teamService.getTeam(auth.getName(), teamId);
+    }
 
     @PostMapping("/")
     public ChatEntity addTeam(
@@ -85,13 +98,21 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/invitaiton/{inviteNumber}/accept")
-    public ChatEntity acceptInvitation(
+    public ResponseEntity<Void> acceptInvitation(
             Authentication auth,
             @PathVariable Long teamId,
             @PathVariable Integer inviteNumber
     ) {
-        return teamService.acceptInvitation(auth.getName(), teamId, inviteNumber);
-    }
+        teamService.acceptInvitation(auth.getName(), teamId, inviteNumber);
 
+        URI appLink = URI.create(
+                "teamup://team/"+teamId
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.FOUND)
+                .location(appLink)
+                .build();
+    }
 
 }

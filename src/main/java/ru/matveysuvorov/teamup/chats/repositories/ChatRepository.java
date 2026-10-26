@@ -4,6 +4,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import ru.matveysuvorov.teamup.chats.entities.ChatEntity;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,4 +14,8 @@ public interface ChatRepository extends JpaRepository<ChatEntity, Integer> {
     List<ChatEntity> findByIsPublic(boolean isPublic, Sort sort);
     boolean existsById(Long id);
     long countById(Long id);
+    long countByIsPublic(boolean isPublic);
+    long countByIsTeam(boolean isTeam);
+    long countByIsPublicAndCreatedAtAfter(boolean isPublic, Instant createdAt);
+    long countByIsTeamAndCreatedAtAfter(boolean isTeam, Instant createdAt);
 }

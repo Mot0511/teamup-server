@@ -159,14 +159,16 @@ public class MessageService {
 
     @Transactional
     public void uploadAttachment(String uid, Long messageId, MultipartFile file) {
+        System.out.println(messageId);
         MessageEntity message = messageRepository.findById(messageId).orElseThrow(() -> new MessageNotFoundException("Message not found"));
+        System.out.println(messageId);
         if (message.getUid() != uid) throw new UnauthorizedException("Unauthorized");
 
         UUID id = UUID.randomUUID();
         String key = "attachments/"+id;
-
         storageService.upload(file, key);
 
+        System.out.println(messageId);
         try {
             FileEntity fileEntity = new FileEntity();
             fileEntity.setId(id);
@@ -183,6 +185,7 @@ public class MessageService {
 
         } catch (Exception e) {
             storageService.delete(key);
+            throw e;
         }
     }
 

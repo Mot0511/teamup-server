@@ -152,6 +152,9 @@ public class TeamService {
 
         memberRepository.deleteByChatId(teamId);
         chatRepository.delete(team);
+        if (team.getIcon() != null) {
+            storageService.delete(team.getIcon().getStorageKey());
+        }
     }
 
     @Transactional
@@ -182,21 +185,24 @@ public class TeamService {
         invite.setExpiredAt(Instant.now().plus(1, ChronoUnit.HOURS));
         inviteRepository.save(invite);
 
-        return "https://192.168.0.71:3000/invite/"+teamId+"/"+number;
+        return "https://192.168.0.71:8080/"+teamId+"/invitation/"+number+"/accept";
     }
 
     public ChatEntity acceptInvitation(String uid, Long teamId, Integer number) {
+        System.out.println(1);
         InviteEntity invite = inviteRepository.findByTeamIdAndNumber(teamId, number).orElseThrow(() -> new InviteNotFoundException("Invite not found"));
+        System.out.println(2);
         if (invite.getExpiredAt().isBefore(Instant.now())) throw new InviteExpiredException("Invite expired");
 
+        System.out.println(3);
         ChatEntity team = chatRepository.findById(teamId).orElseThrow(() -> new TeamNotFoundException("Team not found"));
-
         UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
         MemberEntity member = new MemberEntity();
         member.setChat(team);
         member.setMember(user);
         member.setCreatedAt(Instant.now());
         memberRepository.save(member);
+        System.out.println(4);
 
         return team;
     }

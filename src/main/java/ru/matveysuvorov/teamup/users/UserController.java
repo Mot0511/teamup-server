@@ -41,6 +41,13 @@ public class UserController {
         return userService.getUsers(page, limit);
     }
 
+    @GetMapping("/search/{request}")
+    public List<UserEntity> searchUsers(
+            @PathVariable String request
+    ) {
+        return userService.searchUsers(request);
+    }
+
     @GetMapping("/{uid}")
     public UserEntity getUser(
             @PathVariable String uid

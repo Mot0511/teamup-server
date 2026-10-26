@@ -66,6 +66,10 @@ public class UserService {
         return userRepository.findAll(PageRequest.of(page, limit, Sort.by(Sort.Direction.DESC, "createdAt"))).getContent();
     }
 
+    public List<UserEntity> searchUsers(String request) {
+        return userRepository.findByUsernameContaining(request);
+    }
+
     public UserEntity create(String uid, CreateUserRequest userdata) {
         AccountEntity account = accountRepository.findById(UUID.fromString(uid)).orElseThrow(() -> new BadCredentialsException("Account not found"));
         if (userRepository.existsByUid(uid)) {
@@ -82,6 +86,7 @@ public class UserService {
         user.setDescription(userdata.description());
         user.setAge(userdata.age());
         user.setGender(userdata.gender());
+        user.setCreatedAt(Instant.now());
 
         if (userdata.game() != null) {
             GameEntity game = gameRepository.findById(userdata.game()).orElseThrow(() -> new GameNotFoundException("Game not found"));
