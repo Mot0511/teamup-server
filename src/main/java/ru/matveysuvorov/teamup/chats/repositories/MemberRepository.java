@@ -40,4 +40,5 @@ WHERE m.chat.isTeam = true
 AND m.member.uid = :uid
 """)
     List<MemberEntity> findTeamsByUid(@Param("uid") String uid);
+    long countByChatId(Long chatId);
 }

@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import retrofit2.http.Path;
 import ru.matveysuvorov.teamup.chats.ChatService;
 import ru.matveysuvorov.teamup.chats.entities.ChatEntity;
 import ru.matveysuvorov.teamup.teams.dto.AddTeamRequest;
@@ -87,6 +88,14 @@ public class TeamController {
             @PathVariable Long teamId
     ) {
         return teamService.getIconUrl(auth.getName(), teamId);
+    }
+
+    @PostMapping("/{teamId}/join")
+    public void joinPublicTeam(
+            Authentication auth,
+            @PathVariable Long teamId
+    ) {
+        teamService.joinPublicTeam(auth.getName(), teamId);
     }
 
     @GetMapping("/{teamId}/invitation")

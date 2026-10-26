@@ -4,6 +4,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.NotAcceptableStatusException;
 import ru.matveysuvorov.teamup.auth.exceptions.UnauthorizedException;
 import ru.matveysuvorov.teamup.chats.ChatService;
 import ru.matveysuvorov.teamup.chats.entities.ChatEntity;
@@ -146,12 +147,14 @@ public class TeamService {
     @Transactional
     public void deleteTeam(String uid, Long teamId) {
         if (!chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorozed");
-        if (chatRepository.countById(teamId) != 1) throw new TooManyMembersException("Too many members of team to delete");
 
         ChatEntity team = chatRepository.findById(teamId).orElseThrow(() -> new TeamNotFoundException("Team not found"));
 
-        memberRepository.deleteByChatId(teamId);
-        chatRepository.delete(team);
+        if (memberRepository.countByChatId(teamId) <= 1 && !team.isPublic()) {
+            chatRepository.delete(team);
+        }
+        memberRepository.deleteByChatIdAndMemberId(teamId, uid);
+
         if (team.getIcon() != null) {
             storageService.delete(team.getIcon().getStorageKey());
         }
@@ -207,6 +210,21 @@ public class TeamService {
         return team;
     }
 
+    public void joinPublicTeam(String uid, Long teamId) {
+        ChatEntity team = chatRepository.findById(teamId).orElseThrow(() -> new TeamNotFoundException("Team not found"));
+
+        if (!team.isPublic()) throw new NotAcceptableStatusException("Team is not public");
+        if (chatService.isMember(uid, teamId)) throw new NotAcceptableStatusException("User is already member of this team");
+
+        UserEntity user = userRepository.findByUid(uid).orElseThrow(() -> new UserNotFoundException("User not found"));
+        MemberEntity member = new MemberEntity();
+        member.setMember(user);
+        member.setChat(team);
+        member.setCreatedAt(Instant.now());
+
+        memberRepository.save(member);
+    }
+
     public void uploadIcon(String uid, Long teamId, MultipartFile file) {
         if (!chatService.isMember(uid, teamId)) throw new UnauthorizedException("Unauthorized");
 
@@ -244,4 +262,6 @@ public class TeamService {
         String url = storageService.getPresignedUrl(team.getIcon().getStorageKey());
         return url;
     }
+
+
 }
